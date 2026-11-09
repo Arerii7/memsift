@@ -1,35 +1,30 @@
 # memsift
 
-Find the clutter in your coding agents' memory before it becomes tomorrow's
-context.
+> Keep coding agent memories tidy, consistent, and under your control.
 
-memsift scans Markdown memory and explicit OpenCode session memories for
-potential duplicates, conflicts, stale references and secrets. Review findings
-in the terminal or a local web interface, then decide what to keep. The index
-stays on your machine; no account, cloud service or language model is required.
+memsift scans Markdown and explicit OpenCode memories for duplicates,
+conflicts, stale references, and possible secrets. Review what it finds, then
+choose what to keep. Your index stays local; no account or cloud service needed.
 
-**Status: early preview.** The core workflow is usable, but it has not yet had
-wide real-world testing. Try it on a copy of your files first, review every diff,
-and keep your own backups.
+**Find. Review. Decide.** Source files change only after you approve a preview.
 
 ## Try it
 
-Requirements: Python 3.12 or newer and SQLite with FTS5. From a checkout of the
-repository:
+Requires Python 3.12 or newer and SQLite with FTS5.
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e .
-
-# Use the included sample rather than your own memory on the first run.
 .venv/bin/memsift init --path tests/fixtures/dirty
 .venv/bin/memsift scan
 .venv/bin/memsift doctor
 .venv/bin/memsift review
 ```
 
-`review` starts a local interface at `http://127.0.0.1:8787`. Stop it with
-`Ctrl+C`. The sample contains a **synthetic** key for testing redaction.
+The sample uses a **synthetic** key to demonstrate secret redaction. `review`
+opens a local interface at `http://127.0.0.1:8787`; stop it with `Ctrl+C`.
+
+> **Preview:** Try memsift on a copy of your files first and review every diff.
 
 To inspect another directory, use `.venv/bin/memsift scan --path /path/to/notes`.
 This also registers that path for future scans; add `--no-save` to scan it once.

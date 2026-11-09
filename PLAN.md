@@ -101,3 +101,4 @@ Status: v0.1.0 vertical slice complete and verified on 2026-11-10.
 
 - [x] Document the preview release, safe first run, and contribution workflow.
 - [x] Ignore local credentials and development artifacts.
+- [x] Put the product summary and first run at the top of the README.
