@@ -4,6 +4,7 @@ import hashlib
 import os
 import re
 import sqlite3
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -498,8 +499,35 @@ def ingest_markdown(
             stats.files += 1
             stats.paths.append(file_path)
             explicit_ids = {block.explicit_id for block in blocks if block.explicit_id}
+            unanchored = [record for record in records if record.id not in explicit_ids]
+            counts = Counter(record.norm_claim for record in unanchored)
+            ambiguous: set[str] = set()
+            old_ids = old_ids_by_path.get(str(file_path), set())
+            try:
+                relpath = str(file_path.relative_to(root))
+            except ValueError:
+                relpath = file_path.name
+            for signature, new_count in counts.items():
+                claim = next(record.claim for record in unanchored if record.norm_claim == signature)
+                old_count = 0
+                while True:
+                    legacy_id = stable_memory_id("markdown", relpath, claim, old_count)
+                    scoped_id = stable_id("ms", "markdown", str(file_path), legacy_id)
+                    if legacy_id not in old_ids and scoped_id not in old_ids:
+                        break
+                    old_count += 1
+                if old_count > 1 and new_count < old_count:
+                    ambiguous.add(signature)
+            if ambiguous:
+                stats.errors.append(
+                    f"{file_path}: identical unanchored records were removed; "
+                    "their identities are ambiguous. Add new unique anchors manually and review saved decisions."
+                )
             found_ids: set[str] = set()
             for record in records:
+                if record.id not in explicit_ids and record.norm_claim in ambiguous:
+                    stats.skipped += 1
+                    continue
                 existing = db.get_memory(conn, record.id)
                 if existing and existing.source_ref.rsplit(":", 1)[0] != str(file_path):
                     if record.id in explicit_ids:

@@ -105,6 +105,9 @@ Examples that change directories are skipped because their working directory
 cannot be inferred reliably.
 The `sources` command follows the same discovery rules as `scan`, and its
 counts describe files found on disk rather than the agent's effective context.
+If identical unanchored records are removed, their identities are ambiguous:
+scan keeps previous decisions separate and asks you to add new unique anchors
+and review those decisions.
 
 ## Status
 

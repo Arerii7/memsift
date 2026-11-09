@@ -95,3 +95,4 @@ Status: v0.1.0 vertical slice complete and verified on 2026-11-10.
 - [x] Preserve files and index during sync failures and rollback.
 - [x] Reconcile changed Markdown records and distinguish projects.
 - [x] Correct anchored fenced memory and npm command punctuation.
+- [x] Avoid reassigning decisions when identical unanchored records are removed.

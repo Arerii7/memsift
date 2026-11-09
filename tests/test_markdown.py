@@ -218,3 +218,42 @@ def test_renamed_anchored_file_is_reconciled(conn, cfg: Config, tmp_path: Path) 
     stats = ingest_markdown(conn, [tmp_path], cfg)
     assert not stats.errors
     assert db.get_memory(conn, "ms_move").source_ref.startswith(str(second))
+
+
+def test_removed_duplicate_does_not_reassign_archived_decision(conn, cfg: Config, tmp_path: Path) -> None:
+    from memsift import actions
+
+    source = tmp_path / "MEMORY.md"
+    source.write_text("- Same fact.\n- Same fact.\n")
+    ingest_markdown(conn, [tmp_path], cfg)
+    records = sorted(db.all_memories(conn), key=lambda record: record.source_ref)
+    actions.archive_memory(conn, records[0].id)
+    source.write_text("- Same fact.\n")
+    stats = ingest_markdown(conn, [tmp_path], cfg)
+    assert stats.errors
+    assert db.get_memory(conn, records[0].id).status == "archived"
+    assert db.get_memory(conn, records[0].id).sync_action == "delete"
+    assert not db.get_memory(conn, records[0].id).source_present
+    assert not db.get_memory(conn, records[1].id).source_present
+    assert not [r for r in db.all_memories(conn) if r.source_present]
+    assert ingest_markdown(conn, [tmp_path], cfg).errors
+    source.write_text("<!-- memsift:id=fresh -->\n- Same fact.\n<!-- /memsift:id=fresh -->\n")
+    assert not ingest_markdown(conn, [tmp_path], cfg).errors
+    assert db.get_memory(conn, "fresh").status == "active"
+    assert db.get_memory(conn, records[0].id).status == "archived"
+
+
+def test_removed_duplicate_does_not_reassign_pending_edit(conn, cfg: Config, tmp_path: Path) -> None:
+    from memsift import actions
+
+    source = tmp_path / "MEMORY.md"
+    source.write_text("- Same fact.\n- Same fact.\n")
+    ingest_markdown(conn, [tmp_path], cfg)
+    records = sorted(db.all_memories(conn), key=lambda record: record.source_ref)
+    actions.edit_memory(conn, records[0].id, claim="Edited fact.")
+    source.write_text("- Same fact.\n")
+    stats = ingest_markdown(conn, [tmp_path], cfg)
+    assert stats.errors
+    assert db.get_memory(conn, records[0].id).claim == "Edited fact."
+    assert db.get_memory(conn, records[0].id).sync_action == "update"
+    assert not db.get_memory(conn, records[0].id).source_present
