@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · memsift{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Memory hygiene</p>
+    <h1>Sift the signal from the noise.</h1>
+    <p class="lede">Duplicates, contradictions, stale references, orphans, and secrets — reviewed locally before anything is written.</p>
+  </div>
+  <div class="health">
+    <div class="health-number">{{ health }}</div>
+    <div class="health-label">health / 100</div>
+    <div class="health-bar"><span style="width: {{ health }}%"></span></div>
+  </div>
+</section>
+
+<section class="stats">
+  <a class="stat" href="/queue">
+    <span class="stat-label">Records</span>
+    <strong>{{ total_records }}</strong>
+  </a>
+  <a class="stat {{ 'warn' if total_findings else 'ok' }}" href="/queue">
+    <span class="stat-label">Open findings</span>
+    <strong>{{ total_findings }}</strong>
+  </a>
+  <a class="stat" href="/sync">
+    <span class="stat-label">Pending writes</span>
+    <strong>{{ pending }}</strong>
+  </a>
+  <div class="stat">
+    <span class="stat-label">Active</span>
+    <strong>{{ status_counts.get('active', 0) }}</strong>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="card">
+    <div class="card-head">
+      <h2>Needs a decision</h2>
+      <a class="text-link" href="/queue">Open queue →</a>
+    </div>
+    {% if findings %}
+      <div class="finding-list">
+        {% for item in findings %}
+          {% set f = item.finding %}
+          <a class="finding-row" href="/memory/{{ f.memory_id }}">
+            <span class="badge badge-{{ f.kind }}">{{ f.kind }}</span>
+            <span class="finding-title">{{ f.title | short(90) }}</span>
+            <span class="score">{{ '%.2f' | format(f.score) }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">No open findings. The memory looks clean.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>By kind</h2>
+      <a class="text-link" href="/queue">Filter →</a>
+    </div>
+    <div class="chips">
+      {% for kind, count in finding_counts.items() %}
+        <a class="chip chip-{{ kind }}" href="/queue?kind={{ kind }}"><span>{{ kind }}</span><b>{{ count }}</b></a>
+      {% else %}
+        <span class="empty">Nothing to triage.</span>
+      {% endfor %}
+    </div>
+    <div class="sources">
+      <h3>Sources</h3>
+      {% for source in sources %}
+        <div class="source-line"><span class="source-kind">{{ source.kind }}</span> {{ source.path }}</div>
+      {% else %}
+        <p class="empty">No sources registered. Run <code>memsift init --path DIR</code>.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="card">
+    <div class="card-head"><h2>Recent activity</h2><a class="text-link" href="/settings">Settings →</a></div>
+    {% if recent %}
+      <div class="event-list">
+        {% for event in recent %}
+          <div class="event-row">
+            <span class="badge badge-action">{{ event.action }}</span>
+            <span class="event-note">{{ event.note | default('—') | short(70) }}</span>
+            <span class="muted">{{ event.at | date }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">No actions yet. Review something in the queue.</p>
+    {% endif %}
+  </div>
+
+  <div class="card safety">
+    <h2>Safe by default</h2>
+    <ul>
+      <li><code>sync</code> is a dry run unless you pass <code>--apply</code>.</li>
+      <li>Only anchored Markdown blocks are writable.</li>
+      <li>Every write gets a timestamped backup and rollback event.</li>
+      <li>Secrets are redacted in the UI and excluded from export.</li>
+      <li>OpenCode stores are read-only.</li>
+    </ul>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Sync · memsift{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Safe writes</p>
+    <h1>Sync preview.</h1>
+    <p class="lede">Only approved, anchored Markdown blocks change. Review the diff, then confirm.</p>
+  </div>
+  {% if pending %}
+    <span class="badge badge-action">{{ pending | length }} pending</span>
+  {% endif %}
+</div>
+
+{% if applied %}
+  <div class="alert alert-ok">Applied. Backup created and rollback event recorded: <code>{{ event }}</code></div>
+{% endif %}
+
+{% if plan.skipped %}
+  <div class="card">
+    <h2>Skipped</h2>
+    {% for item in plan.skipped %}<p class="muted">{{ item }}</p>{% endfor %}
+  </div>
+{% endif %}
+
+{% if plan.changed %}
+  <div class="card">
+    <div class="card-head">
+      <h2>Changed files</h2>
+      <span class="muted">{{ plan.changes | length }} file(s)</span>
+    </div>
+    <div class="pending-list">
+      {% for record in pending %}
+        <div class="pending-row">
+          <span class="badge badge-{{ record.sync_action }}">{{ record.sync_action }}</span>
+          <span class="claim-preview">{{ record.claim | redact | short(100) }}</span>
+          <span class="muted">{{ record.source_ref | short(60) }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Unified diff</h2>
+    <pre class="diff">{{ plan.diff_text() }}</pre>
+    <form class="actions" method="post" action="/sync/apply">
+      <label class="check"><input type="checkbox" name="confirm" value="yes" required> I reviewed this diff and want to write these files.</label>
+      <button class="button button-accent" type="submit">Apply sync</button>
+    </form>
+  </div>
+{% else %}
+  <div class="empty-state">
+    <h2>Nothing pending.</h2>
+    <p>Merge, archive, forget, or edit a record first. Writes stay pending until you apply them here.</p>
+    <a class="button" href="/queue">Open queue</a>
+  </div>
+{% endif %}
+
+<div class="card safety">
+  <h2>What apply does</h2>
+  <ul>
+    <li>Copies every changed file into <code>{{ cfg.backups_dir }}</code>.</li>
+    <li>Writes via temp file + fsync + rename.</li>
+    <li>Records a sync event with per-file backup paths.</li>
+    <li>Leaves every unapproved block untouched.</li>
+  </ul>
+</div>
+{% endblock %}

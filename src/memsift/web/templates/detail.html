@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}{{ record.id }} · memsift{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="/queue">Queue</a> / {{ record.id }}</div>
+
+{% if view.sensitivity == 'secret' %}
+  <div class="alert alert-warn">This record contains secret material. The value is redacted here and excluded from export.</div>
+{% endif %}
+
+<section class="detail-layout">
+  <div class="card detail-main">
+    <div class="queue-top">
+      <span class="badge badge-{{ record.status }}">{{ record.status }}</span>
+      {% if record.pinned %}<span class="badge badge-action">pinned</span>{% endif %}
+      <span class="score">confidence {{ '%.2f' | format(record.confidence) }}</span>
+      <span class="muted">{{ record.id }}</span>
+    </div>
+    <h1>{{ view.claim | short(140) }}</h1>
+    <pre class="body-block">{{ view.body }}</pre>
+
+    <div class="meta-grid">
+      <div><span>topic</span><strong>{{ record.topic_key or '—' }}</strong></div>
+      <div><span>scope</span><strong>{{ record.scope }}</strong></div>
+      <div><span>source</span><strong>{{ record.source_kind }}</strong></div>
+      <div><span>reference</span><strong>{{ record.source_ref }}</strong></div>
+      <div><span>created</span><strong>{{ record.created_at | date }} · {{ record.created_at | age }}</strong></div>
+      <div><span>sync action</span><strong>{{ record.sync_action }}</strong></div>
+    </div>
+
+    {% if record.files %}
+      <div class="meta-row"><span>files:</span> {% for file in record.files %}<code>{{ file }}</code>{% endfor %}</div>
+    {% endif %}
+    {% if record.superseded_by %}
+      <p class="muted">Superseded by <a href="/memory/{{ record.superseded_by }}">{{ record.superseded_by }}</a></p>
+    {% endif %}
+
+    <div class="actions actions-wrap">
+      <form method="post" action="/memory/{{ record.id }}/action">
+        <input type="hidden" name="action" value="pin">
+        <button class="button button-ghost" type="submit">Pin</button>
+      </form>
+      {% if record.status in ['archived', 'forgotten', 'rejected'] %}
+        <form method="post" action="/memory/{{ record.id }}/action">
+          <input type="hidden" name="action" value="restore">
+          <button class="button button-ghost" type="submit">Restore</button>
+        </form>
+      {% else %}
+        <form method="post" action="/memory/{{ record.id }}/action" data-confirm="Archive this record? sync will propose removing its block.">
+          <input type="hidden" name="action" value="archive">
+          <button class="button button-ghost" type="submit">Archive</button>
+        </form>
+        <form method="post" action="/memory/{{ record.id }}/action" data-confirm="Forget this record? sync will propose deleting it.">
+          <input type="hidden" name="action" value="forget">
+          <button class="button button-danger" type="submit">Forget</button>
+        </form>
+      {% endif %}
+    </div>
+
+    {% if view.sensitivity != 'secret' %}
+      <form class="edit-form" method="post" action="/memory/{{ record.id }}/action">
+        <input type="hidden" name="action" value="edit">
+        <label for="claim">Edit canonical claim</label>
+        <div class="input-row">
+          <input id="claim" name="claim" value="{{ view.claim }}">
+          <button class="button" type="submit">Save edit</button>
+        </div>
+        <p class="hint">Saving sets <code>sync_action=update</code>; nothing is written until sync.</p>
+      </form>
+    {% else %}
+      <p class="hint">Editing is disabled while the record is classified as secret. Archive or forget it instead.</p>
+    {% endif %}
+  </div>
+
+  <aside class="detail-side">
+    <div class="card">
+      <div class="card-head"><h2>Findings</h2><span class="muted">{{ findings | length }}</span></div>
+      {% for f in findings %}
+        <div class="side-finding">
+          <span class="badge badge-{{ f.kind }}">{{ f.kind }}</span>
+          <p>{{ f.title | short(120) }}</p>
+          <p class="muted">{{ f.detail | short(180) }}</p>
+          <div class="actions">
+            <form method="post" action="/findings/{{ f.id }}/approve"><button class="button button-ghost" type="submit">Approve</button></form>
+            <form method="post" action="/findings/{{ f.id }}/reject"><button class="button button-ghost" type="submit">Dismiss</button></form>
+          </div>
+        </div>
+      {% else %}
+        <p class="empty">No open findings for this record.</p>
+      {% endfor %}
+    </div>
+
+    {% if related %}
+      <div class="card">
+        <h2>Related</h2>
+        {% for item in related %}
+          <a class="related-card" href="/memory/{{ item.id }}">
+            <span class="badge badge-{{ item.status }}">{{ item.status }}</span>
+            <span>{{ item.claim | redact | short(100) }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="card">
+      <h2>History</h2>
+      {% for event in events %}
+        <div class="event-row">
+          <span class="badge badge-action">{{ event.action }}</span>
+          <span class="event-note">{{ event.note | default('—') | short(70) }}</span>
+          <span class="muted">{{ event.at | date }}</span>
+        </div>
+      {% else %}
+        <p class="empty">No events yet.</p>
+      {% endfor %}
+    </div>
+  </aside>
+</section>
+{% endblock %}

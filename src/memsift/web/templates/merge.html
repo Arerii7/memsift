@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Merge · memsift{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Side-by-side</p>
+    <h1>Merge memories.</h1>
+    <p class="lede">Pick the canonical record, edit the final claim, and archive the other. The write stays pending until sync.</p>
+  </div>
+</div>
+
+{% if view_left and view_right %}
+  <div class="merge-grid">
+    <article class="card merge-card">
+      <div class="queue-top"><span class="badge badge-{{ view_left.status }}">{{ view_left.status }}</span><span class="muted">left · {{ view_left.id }}</span></div>
+      <h2>{{ view_left.claim | short(120) }}</h2>
+      <pre class="body-block small">{{ view_left.body }}</pre>
+      <div class="meta-row"><span>{{ view_left.topic_key or 'no topic' }}</span><span>{{ view_left.source_ref | short(60) }}</span></div>
+    </article>
+    <article class="card merge-card">
+      <div class="queue-top"><span class="badge badge-{{ view_right.status }}">{{ view_right.status }}</span><span class="muted">right · {{ view_right.id }}</span></div>
+      <h2>{{ view_right.claim | short(120) }}</h2>
+      <pre class="body-block small">{{ view_right.body }}</pre>
+      <div class="meta-row"><span>{{ view_right.topic_key or 'no topic' }}</span><span>{{ view_right.source_ref | short(60) }}</span></div>
+    </article>
+  </div>
+
+  <div class="card merge-form">
+    <form method="post" action="/merge">
+      <div class="form-grid">
+        <label>Canonical record
+          <select name="canonical">
+            {% for record in records %}
+              <option value="{{ record.id }}" {{ 'selected' if record.id == view_left.id else '' }}>{{ record.id }} · {{ record.claim | redact | short(80) }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Archive this record
+          <select name="other">
+            {% for record in records %}
+              <option value="{{ record.id }}" {{ 'selected' if record.id == view_right.id else '' }}>{{ record.id }} · {{ record.claim | redact | short(80) }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <label>Final claim
+        <input name="claim" value="{{ view_left.claim }}">
+      </label>
+      <div class="actions">
+        <button class="button button-accent" type="submit">Merge and archive other</button>
+        <a class="button button-ghost" href="/merge?a={{ view_right.id }}&b={{ view_left.id }}">Swap sides</a>
+        <a class="button button-ghost" href="/queue">Cancel</a>
+      </div>
+      <p class="hint">The non-canonical record gets <code>status=archived</code> and <code>sync_action=delete</code>. Nothing is removed from disk until <code>memsift sync --apply</code>.</p>
+    </form>
+  </div>
+{% else %}
+  <div class="empty-state">
+    <h2>Need two records.</h2>
+    <p>Run <code>memsift scan</code> to populate the index, or open a duplicate/conflict from the queue.</p>
+    <a class="button" href="/queue">Open queue</a>
+  </div>
+{% endif %}
+{% endblock %}

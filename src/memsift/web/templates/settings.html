@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Settings · memsift{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Local configuration</p>
+    <h1>Settings.</h1>
+    <p class="lede">Everything lives under one local directory. There are no accounts, tokens, or cloud services.</p>
+  </div>
+</div>
+
+<section class="grid two">
+  <div class="card">
+    <h2>Paths</h2>
+    <div class="meta-grid single">
+      <div><span>home</span><strong>{{ cfg.home }}</strong></div>
+      <div><span>database</span><strong>{{ cfg.db_path }}</strong></div>
+      <div><span>config</span><strong>{{ cfg.config_path }}</strong></div>
+      <div><span>backups</span><strong>{{ cfg.backups_dir }}</strong></div>
+      <div><span>TTL days</span><strong>{{ cfg.ttl_days }} (0 = off)</strong></div>
+      <div><span>min confidence</span><strong>{{ cfg.min_confidence }}</strong></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sources</h2>
+    {% for source in cfg.sources %}
+      <div class="source-line"><span class="source-kind">{{ source.kind }}</span> {{ source.path }}</div>
+    {% else %}
+      <p class="empty">No sources. Run <code>memsift init --path DIR</code>.</p>
+    {% endfor %}
+    <p class="hint">Add more with <code>memsift scan --path DIR</code>. Sources are read-only; only anchored blocks are writable.</p>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="card">
+    <h2>Index</h2>
+    <div class="chips">
+      {% for status, count in status_counts.items() %}
+        <span class="chip chip-{{ status }}">{{ status }} <b>{{ count }}</b></span>
+      {% else %}
+        <span class="empty">Empty index.</span>
+      {% endfor %}
+    </div>
+    <p class="muted">{{ total }} indexed record(s).</p>
+  </div>
+
+  <div class="card safety">
+    <h2>Safety model</h2>
+    <ul>
+      <li><code>sync</code> defaults to dry-run.</li>
+      <li>Backups live under <code>{{ cfg.backups_dir }}</code>.</li>
+      <li>Secrets are hidden and excluded from export.</li>
+      <li>OpenCode sessions are imported read-only.</li>
+      <li>No network calls in the core pipeline.</li>
+    </ul>
+  </div>
+</section>
+
+<div class="card">
+  <div class="card-head"><h2>Clean export preview</h2><span class="muted">active, non-secret only</span></div>
+  <pre class="diff">{{ export_preview }}</pre>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Queue · memsift{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Review queue</p>
+    <h1>One decision at a time.</h1>
+  </div>
+  <div class="chips">
+    <a class="chip {{ 'selected' if not kind else '' }}" href="/queue">all</a>
+    {% for name in kinds %}
+      <a class="chip chip-{{ name }} {{ 'selected' if kind == name else '' }}" href="/queue?kind={{ name }}">{{ name }} <b>{{ counts.get(name, 0) }}</b></a>
+    {% endfor %}
+  </div>
+</div>
+
+{% if items %}
+  <div class="queue">
+    {% for item in items %}
+      {% set f = item.finding %}
+      {% set r = item.record %}
+      <article class="queue-card">
+        <div class="queue-top">
+          <span class="badge badge-{{ f.kind }}">{{ f.kind }}</span>
+          <span class="score">score {{ '%.2f' | format(f.score) }}</span>
+          <span class="muted">{{ f.id }}</span>
+        </div>
+        <h2>{{ f.title | short(120) }}</h2>
+        <p class="detail">{{ f.detail | short(260) }}</p>
+        {% if r %}
+          <div class="claim-preview">{{ r.claim | redact | short(180) }}</div>
+          <div class="meta-row">
+            <span>{{ r.status }}</span>
+            <span>{{ r.topic_key or 'no topic' }}</span>
+            <span>{{ r.source_ref | short(60) }}</span>
+            <span>confidence {{ '%.2f' | format(r.confidence) }}</span>
+          </div>
+        {% endif %}
+        {% if item.related %}
+          <div class="related-line">related: <span>{{ item.related.claim | redact | short(110) }}</span></div>
+        {% endif %}
+        <div class="actions">
+          <a class="button" href="/memory/{{ f.memory_id }}">Review</a>
+          {% if f.related_id and f.kind in ['duplicate', 'conflict'] %}
+            <a class="button button-accent" href="/merge?a={{ f.memory_id }}&b={{ f.related_id }}">Merge</a>
+          {% endif %}
+          <form method="post" action="/findings/{{ f.id }}/approve" data-confirm="Approve this finding?">
+            <button class="button button-ghost" type="submit">Approve</button>
+          </form>
+          <form method="post" action="/findings/{{ f.id }}/reject" data-confirm="Dismiss as a false positive?">
+            <button class="button button-ghost" type="submit">Dismiss</button>
+          </form>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty-state">
+    <h2>Queue is empty{% if kind %} for {{ kind }}{% endif %}.</h2>
+    <p>Run <code>memsift scan</code> after adding memory sources.</p>
+    <a class="button" href="/">Back to dashboard</a>
+  </div>
+{% endif %}
+{% endblock %}

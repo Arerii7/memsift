@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}memsift{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+  <script defer src="{{ url_for('static', path='app.js') }}"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="brand-mark">◈</span>
+      <span>memsift</span>
+    </a>
+    <nav>
+      <a href="/" class="{{ 'active' if active == 'dashboard' else '' }}">Dashboard</a>
+      <a href="/queue" class="{{ 'active' if active == 'queue' else '' }}">Queue</a>
+      <a href="/merge" class="{{ 'active' if active == 'merge' else '' }}">Merge</a>
+      <a href="/sync" class="{{ 'active' if active == 'sync' else '' }}">Sync</a>
+      <a href="/settings" class="{{ 'active' if active == 'settings' else '' }}">Settings</a>
+    </nav>
+    <span class="version">v{{ version }}</span>
+  </header>
+
+  <main>
+    {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <span>local only · 127.0.0.1 · sources are read-only until sync</span>
+    <span>{{ cfg.home }}</span>
+  </footer>
+</body>
+</html>
