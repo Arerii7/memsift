@@ -14,7 +14,7 @@ from pathlib import Path
 
 from . import db
 from .config import Config
-from .ingest.markdown import parse_blocks
+from .ingest.markdown import parse_blocks, parse_markdown_blocks
 from .models import MemoryRecord, now_ms
 
 
@@ -60,6 +60,17 @@ def _path_from_ref(source_ref: str) -> Path:
     return Path(source_ref.rsplit(":", 1)[0]).expanduser()
 
 
+def _read_text_exact(path: Path) -> str:
+    with path.open(encoding="utf-8", newline="") as handle:
+        return handle.read()
+
+
+def _source_digest(text: str) -> str:
+    # Markdown ingestion uses universal newline translation.
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
 def _pending(conn: sqlite3.Connection) -> list[MemoryRecord]:
     return [
         record
@@ -80,11 +91,11 @@ def plan_sync(conn: sqlite3.Connection) -> SyncPlan:
             plan.skipped.append(f"{path}: source file no longer exists")
             continue
         try:
-            original = path.read_text(encoding="utf-8")
+            original = _read_text_exact(path)
         except OSError as exc:
             plan.skipped.append(f"{path}: {exc}")
             continue
-        digest = hashlib.sha256(original.encode("utf-8")).hexdigest()
+        digest = _source_digest(original)
         if any(record.source_hash != digest for record in records):
             plan.skipped.append(
                 f"{path}: source file changed since scan; rescan and review pending changes"
@@ -92,7 +103,7 @@ def plan_sync(conn: sqlite3.Connection) -> SyncPlan:
             continue
         blocks = parse_blocks(original, filename=path.name, relpath=path.name)
         by_id = {block.explicit_id: block for block in blocks if block.explicit_id}
-        lines = original.splitlines()
+        lines = original.splitlines(keepends=True)
         edits: list[tuple[int, int, list[str], str]] = []
         memory_ids: list[str] = []
         for record in records:
@@ -101,7 +112,10 @@ def plan_sync(conn: sqlite3.Connection) -> SyncPlan:
                 plan.skipped.append(f"{path}: no writable anchor for {record.id}")
                 continue
             if record.sync_action == "update":
-                replacement = record.body.splitlines() or [record.claim]
+                content = record.body.splitlines() or [record.claim]
+                old_line = lines[block.content_start]
+                ending = "\r\n" if old_line.endswith("\r\n") else "\n"
+                replacement = [line + ending for line in content]
                 edits.append((block.content_start, block.content_end, replacement, record.id))
             else:
                 end = block.end_line
@@ -116,9 +130,7 @@ def plan_sync(conn: sqlite3.Connection) -> SyncPlan:
         new_lines = list(lines)
         for start, end, replacement, _memory_id in edits:
             new_lines[start:end] = replacement
-        updated = "\n".join(new_lines)
-        if original.endswith("\n"):
-            updated += "\n"
+        updated = "".join(new_lines)
         diff = "".join(
             difflib.unified_diff(
                 original.splitlines(keepends=True),
@@ -170,12 +182,13 @@ def apply_sync(
     if not changed:
         raise ValueError("nothing to sync")
     for change in changed:
-        if change.path.read_text(encoding="utf-8") != change.original:
+        if _read_text_exact(change.path) != change.original:
             raise ValueError(f"source file changed since sync preview: {change.path}")
     cfg.ensure_dirs()
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    backup_dir = cfg.backups_dir / stamp
-    backup_dir.mkdir(parents=True, exist_ok=False)
+    backup_dir = Path(tempfile.mkdtemp(prefix=f"{stamp}-", dir=cfg.backups_dir))
+    if stat.S_IMODE(backup_dir.stat().st_mode) != 0o700:
+        raise OSError(f"backup directory is not private: {backup_dir}")
     files: list[dict[str, str]] = []
     written: list[tuple[Path, Path]] = []
     try:
@@ -184,7 +197,8 @@ def apply_sync(
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(change.path, dest)
             _atomic_write(change.path, change.updated)
-            digest = hashlib.sha256(change.updated.encode("utf-8")).hexdigest()
+            written.append((change.path, dest))
+            digest = _source_digest(change.updated)
             db.upsert_source_file(
                 conn,
                 change.path,
@@ -200,23 +214,24 @@ def apply_sync(
                     source_hash=digest,
                     last_seen_at=now_ms(),
                 )
-            files.append({"path": str(change.path), "backup": str(dest)})
-            written.append((change.path, dest))
+            files.append({"path": str(change.path), "backup": str(dest), "written_hash": hashlib.sha256(change.updated.encode("utf-8")).hexdigest()})
+        event_id = db.insert_event(
+            conn,
+            memory_id=None,
+            action="sync",
+            actor=actor,
+            before={"files": [{"path": str(c.path), "hash": hashlib.sha256(c.original.encode()).hexdigest()} for c in changed]},
+            after={"backup_dir": str(backup_dir), "files": files, "memory_ids": plan.memory_ids},
+            note=f"Applied {len(changed)} file change(s).",
+        )
+        conn.commit()
     except Exception:
+        conn.rollback()
         # A failed multi-file sync must not leave a half-applied plan.
         for path, dest in written:
             shutil.copy2(dest, path)
         raise
 
-    event_id = db.insert_event(
-        conn,
-        memory_id=None,
-        action="sync",
-        actor=actor,
-        before={"files": [{"path": str(c.path), "hash": hashlib.sha256(c.original.encode()).hexdigest()} for c in changed]},
-        after={"backup_dir": str(backup_dir), "files": files, "memory_ids": plan.memory_ids},
-        note=f"Applied {len(changed)} file change(s).",
-    )
     return SyncResult(event_id=event_id, backup_dir=backup_dir, files=files, memory_ids=plan.memory_ids)
 
 
@@ -235,30 +250,67 @@ def rollback_event(
     files = payload.get("files", [])
     if not files:
         raise ValueError("sync event has no backed-up files")
-    restored: dict[str, str] = {}
+    for memory_id in payload.get("memory_ids", []):
+        record = db.get_memory(conn, memory_id)
+        if record is not None and record.sync_action != "none":
+            raise ValueError(f"memory has pending changes; review before rollback: {memory_id}")
+    to_restore: list[tuple[Path, str, str]] = []
     for item in files:
         path = Path(str(item["path"]))
         backup = Path(str(item["backup"]))
         if not backup.exists():
             raise ValueError(f"backup is missing: {backup}")
-        original = backup.read_text(encoding="utf-8")
-        _atomic_write(path, original)
-        digest = hashlib.sha256(original.encode("utf-8")).hexdigest()
-        db.upsert_source_file(
+        expected_hash = item.get("written_hash")
+        if not expected_hash:
+            raise ValueError("sync event has no written hash; cannot safely rollback")
+        current = _read_text_exact(path)
+        if hashlib.sha256(current.encode("utf-8")).hexdigest() != expected_hash:
+            raise ValueError(f"source file changed since sync: {path}")
+        to_restore.append((path, _read_text_exact(backup), current))
+
+    restored: dict[str, str] = {}
+    written: list[tuple[Path, str]] = []
+    try:
+        for path, original, current in to_restore:
+            _atomic_write(path, original)
+            written.append((path, current))
+            digest = _source_digest(original)
+            db.upsert_source_file(
+                conn,
+                path,
+                digest=digest,
+                mtime=int(path.stat().st_mtime * 1000),
+                parser="markdown",
+            )
+            restored[str(path)] = digest
+
+        for memory_id in payload.get("memory_ids", []):
+            record = db.get_memory(conn, memory_id)
+            if record is None:
+                continue
+            source = _path_from_ref(record.source_ref)
+            if str(source) not in restored:
+                continue
+            root = Path(record.scope.removeprefix("project:")) if record.scope.startswith("project:") else source.parent
+            source_records, _ = parse_markdown_blocks(source, root)
+            previous = next((item for item in source_records if item.id == memory_id), None)
+            if previous is None:
+                raise ValueError(f"restored source has no memory: {memory_id}")
+            db.update_memory_fields(conn, memory_id, status="active", sync_action="none", superseded_by=None)
+            db.upsert_memory(conn, previous)
+        db.insert_event(
             conn,
-            path,
-            digest=digest,
-            mtime=int(path.stat().st_mtime * 1000),
-            parser="markdown",
+            memory_id=None,
+            action="rollback",
+            actor=actor,
+            before={"rollback_of": event_id},
+            after={"files": restored},
+            note=f"Restored {len(restored)} file(s) from backup.",
         )
-        restored[str(path)] = digest
-    db.insert_event(
-        conn,
-        memory_id=None,
-        action="rollback",
-        actor=actor,
-        before={"rollback_of": event_id},
-        after={"files": restored},
-        note=f"Restored {len(restored)} file(s) from backup.",
-    )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        for path, current in written:
+            _atomic_write(path, current)
+        raise
     return list(restored)

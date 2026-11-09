@@ -44,10 +44,10 @@
           {% if f.related_id and f.kind in ['duplicate', 'conflict'] %}
             <a class="button button-accent" href="/merge?a={{ f.memory_id }}&b={{ f.related_id }}">Merge</a>
           {% endif %}
-          <form method="post" action="/findings/{{ f.id }}/approve" data-confirm="Approve this finding?">
+          <form method="post" action="/findings/{{ f.id }}/approve" data-confirm="Approve this finding?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button class="button button-ghost" type="submit">Approve</button>
           </form>
-          <form method="post" action="/findings/{{ f.id }}/reject" data-confirm="Dismiss as a false positive?">
+          <form method="post" action="/findings/{{ f.id }}/reject" data-confirm="Dismiss as a false positive?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button class="button button-ghost" type="submit">Dismiss</button>
           </form>
         </div>

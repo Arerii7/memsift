@@ -85,3 +85,136 @@ def test_terminal_status_survives_rescan(conn, cfg: Config, dirty_project: Path)
     conn.commit()
     ingest_markdown(conn, [dirty_project], cfg)
     assert db.get_memory(conn, record.id).status == "archived"
+
+
+def test_rescan_marks_removed_block_as_orphan_without_false_conflict(conn, cfg: Config, tmp_path: Path) -> None:
+    source = tmp_path / "MEMORY.md"
+    source.write_text("- We use SQLite.\n")
+    ingest_markdown(conn, [tmp_path], cfg)
+    previous = db.all_memories(conn)[0]
+    source.write_text("- We use Postgres.\n")
+    ingest_markdown(conn, [tmp_path], cfg)
+    report = run_detectors(conn, cfg)
+    assert not [f for f in report.findings if f.kind == "conflict"]
+    assert db.get_memory(conn, previous.id).status == "orphan"
+    assert any(record.claim == "We use Postgres." for record in db.all_memories(conn))
+
+
+def test_same_memory_in_two_projects_keeps_separate_sources(conn, cfg: Config, tmp_path: Path) -> None:
+    roots = [tmp_path / "first", tmp_path / "second"]
+    for root in roots:
+        root.mkdir()
+        (root / "MEMORY.md").write_text("- We use SQLite.\n")
+    ingest_markdown(conn, roots, cfg)
+    records = db.all_memories(conn)
+    assert len(records) == 2
+    assert {record.scope for record in records} == {f"project:{root}" for root in roots}
+    ids = {record.id for record in records}
+    first = next(record for record in records if record.scope == f"project:{roots[0]}")
+    db.update_memory_fields(conn, first.id, status="archived", sync_action="delete")
+    ingest_markdown(conn, roots, cfg)
+    assert {record.id for record in db.all_memories(conn)} == ids
+    assert db.get_memory(conn, first.id).status == "archived"
+    assert db.get_memory(conn, first.id).sync_action == "delete"
+
+
+def test_deleted_pending_update_is_retained_and_marked_orphan(conn, cfg: Config, tmp_path: Path) -> None:
+    from memsift import actions
+
+    source = tmp_path / "MEMORY.md"
+    source.write_text("- We use SQLite.\n")
+    ingest_markdown(conn, [tmp_path], cfg)
+    record = db.all_memories(conn)[0]
+    actions.edit_memory(conn, record.id, claim="Use a new database.")
+    source.write_text("- We use Postgres.\n")
+    ingest_markdown(conn, [tmp_path], cfg)
+    run_detectors(conn, cfg)
+    retained = db.get_memory(conn, record.id)
+    assert retained.claim == "Use a new database."
+    assert retained.sync_action == "update"
+    assert retained.status == "orphan"
+
+
+def test_duplicate_anchor_id_does_not_overwrite_other_project(conn, cfg: Config, tmp_path: Path) -> None:
+    roots = [tmp_path / "first", tmp_path / "second"]
+    for root in roots:
+        root.mkdir()
+        (root / "MEMORY.md").write_text("<!-- memsift:id=ms_same -->\n- Fact.\n<!-- /memsift:id=ms_same -->\n")
+    ingest_markdown(conn, [roots[0]], cfg)
+    stats = ingest_markdown(conn, [roots[1]], cfg)
+    assert stats.errors
+    assert db.get_memory(conn, "ms_same").source_ref.startswith(str(roots[0]))
+
+
+def test_restored_block_keeps_id_and_pending_edit(conn, cfg: Config, tmp_path: Path) -> None:
+    from memsift import actions
+
+    source = tmp_path / "MEMORY.md"
+    source.write_text("- We use SQLite.\n")
+    ingest_markdown(conn, [tmp_path], cfg)
+    record = db.all_memories(conn)[0]
+    actions.edit_memory(conn, record.id, claim="Use a new database.")
+    source.write_text("- We use Postgres.\n")
+    ingest_markdown(conn, [tmp_path], cfg)
+    source.write_text("- We use SQLite.\n")
+    ingest_markdown(conn, [tmp_path], cfg)
+    restored = db.get_memory(conn, record.id)
+    assert restored.source_present
+    assert restored.claim == "Use a new database."
+    assert restored.sync_action == "update"
+    assert restored.status == "active"
+
+
+def test_existing_database_migrates_without_changing_record(tmp_path: Path) -> None:
+    import sqlite3
+
+    path = tmp_path / "legacy.db"
+    connection = sqlite3.connect(path)
+    connection.executescript(db.SCHEMA)
+    connection.execute(
+        "INSERT INTO memories (id, claim, norm_claim, body, scope, source_kind, source_ref, "
+        "source_hash, created_at, updated_at, last_seen_at, confidence, status, sync_action) "
+        "VALUES ('old', 'old claim', 'old', 'old body', 'project:/tmp', 'markdown', "
+        "'/tmp/MEMORY.md:1', 'hash', 1, 1, 1, 0.5, 'archived', 'delete')"
+    )
+    connection.commit()
+    connection.close()
+    connection = db.connect(path)
+    try:
+        record = db.get_memory(connection, "old")
+        assert record.source_present
+        assert record.status == "archived"
+        assert record.sync_action == "delete"
+    finally:
+        connection.close()
+
+
+def test_moved_anchor_keeps_identity_and_pending_action(conn, cfg: Config, tmp_path: Path) -> None:
+    from memsift import actions
+
+    first = tmp_path / "A.md"
+    second = tmp_path / "B.md"
+    anchored = "<!-- memsift:id=ms_move -->\n- A fact.\n<!-- /memsift:id=ms_move -->\n"
+    first.write_text(anchored)
+    ingest_markdown(conn, [tmp_path], cfg)
+    actions.archive_memory(conn, "ms_move")
+    second.write_text(anchored)
+    first.write_text("# Empty\n")
+    stats = ingest_markdown(conn, [second, first], cfg)
+    assert not stats.errors
+    moved = db.get_memory(conn, "ms_move")
+    assert moved.source_ref.startswith(str(second))
+    assert moved.status == "archived"
+    assert moved.sync_action == "delete"
+    assert moved.source_present
+
+
+def test_renamed_anchored_file_is_reconciled(conn, cfg: Config, tmp_path: Path) -> None:
+    first = tmp_path / "A.md"
+    second = tmp_path / "B.md"
+    first.write_text("<!-- memsift:id=ms_move -->\n- A fact.\n<!-- /memsift:id=ms_move -->\n")
+    ingest_markdown(conn, [tmp_path], cfg)
+    first.rename(second)
+    stats = ingest_markdown(conn, [tmp_path], cfg)
+    assert not stats.errors
+    assert db.get_memory(conn, "ms_move").source_ref.startswith(str(second))

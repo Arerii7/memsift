@@ -11,7 +11,9 @@ def detect_orphans(records: list[MemoryRecord]) -> list[Finding]:
         if record.status in {"archived", "forgotten", "rejected"}:
             continue
         reason = ""
-        if not record.source_ref:
+        if not record.source_present:
+            reason = "The memory block is no longer present in its source file."
+        elif not record.source_ref:
             reason = "No provenance: source reference is empty."
         elif record.source_kind == "opencode" and not (record.session_id and record.message_id):
             reason = "Imported from a session without session/message IDs."

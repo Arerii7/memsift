@@ -428,6 +428,14 @@ def redact_text(text: str) -> str:
     return result
 
 
+def redact_diff(text: str) -> str:
+    masked = redact_text(text)
+    return "".join(
+        line[0] + redact_text(line[1:]) if line and line[0] in " +-" else redact_text(line)
+        for line in masked.splitlines(keepends=True)
+    )
+
+
 def redact_record_body(record: object) -> str:
     body = getattr(record, "body", "")
     return redact_text(str(body))

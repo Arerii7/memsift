@@ -59,6 +59,7 @@ class MemoryRecord:
     pinned: bool = False
     sync_action: str = "none"
     block_kind: str = "paragraph"
+    source_present: bool = True
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -86,6 +87,7 @@ class MemoryRecord:
             "pinned": int(self.pinned),
             "sync_action": self.sync_action,
             "block_kind": self.block_kind,
+            "source_present": int(self.source_present),
         }
 
     @classmethod
@@ -115,6 +117,7 @@ class MemoryRecord:
             pinned=bool(row["pinned"]),
             sync_action=row["sync_action"],
             block_kind=row["block_kind"],
+            source_present=bool(row["source_present"]),
         )
 
 

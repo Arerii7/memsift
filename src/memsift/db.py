@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from collections.abc import Iterable
 from pathlib import Path
@@ -123,6 +124,19 @@ END;
 def connect(path: str | Path) -> sqlite3.Connection:
     db_path = Path(path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
+    if db_path.is_symlink():
+        raise OSError(f"database path is a symbolic link: {db_path}")
+    fd = os.open(db_path, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+    finally:
+        os.close(fd)
+    for suffix in ("-wal", "-shm"):
+        sidecar = Path(str(db_path) + suffix)
+        if sidecar.is_symlink():
+            raise OSError(f"database sidecar is a symbolic link: {sidecar}")
+        if sidecar.exists():
+            sidecar.chmod(0o600)
     conn = sqlite3.connect(str(db_path), timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -134,6 +148,9 @@ def connect(path: str | Path) -> sqlite3.Connection:
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(memories)")}
+    if "source_present" not in columns:
+        conn.execute("ALTER TABLE memories ADD COLUMN source_present INTEGER NOT NULL DEFAULT 1")
     conn.commit()
 
 
@@ -157,6 +174,7 @@ def upsert_memory(conn: sqlite3.Connection, record: MemoryRecord) -> None:
             source_kind = excluded.source_kind,
             source_ref = excluded.source_ref,
             source_hash = excluded.source_hash,
+            source_present = 1,
             session_id = excluded.session_id,
             message_id = excluded.message_id,
             last_seen_at = excluded.last_seen_at,

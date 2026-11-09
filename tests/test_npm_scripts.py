@@ -66,3 +66,10 @@ def test_command_with_cd_is_not_checked_against_wrong_manifest(conn, cfg, tmp_pa
     (tmp_path / 'AGENTS.md').write_text('```bash\ncd frontend && npm run build\n```\n')
     ingest_markdown(conn, [tmp_path], cfg)
     assert not [f for f in run_detectors(conn, cfg).findings if f.kind == 'stale_script']
+
+
+def test_sentence_ending_after_script_is_not_part_of_name(conn, cfg, tmp_path: Path) -> None:
+    (tmp_path / 'package.json').write_text('{"scripts":{"test":"pytest"}}')
+    (tmp_path / 'AGENTS.md').write_text('- Run npm run test.\n')
+    ingest_markdown(conn, [tmp_path], cfg)
+    assert not [f for f in run_detectors(conn, cfg).findings if f.kind == 'stale_script']

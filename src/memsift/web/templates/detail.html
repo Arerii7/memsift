@@ -35,21 +35,21 @@
     {% endif %}
 
     <div class="actions actions-wrap">
-      <form method="post" action="/memory/{{ record.id }}/action">
+      <form method="post" action="/memory/{{ record.id }}/action"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="action" value="pin">
         <button class="button button-ghost" type="submit">Pin</button>
       </form>
       {% if record.status in ['archived', 'forgotten', 'rejected'] %}
-        <form method="post" action="/memory/{{ record.id }}/action">
+        <form method="post" action="/memory/{{ record.id }}/action"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="action" value="restore">
           <button class="button button-ghost" type="submit">Restore</button>
         </form>
       {% else %}
-        <form method="post" action="/memory/{{ record.id }}/action" data-confirm="Archive this record? sync will propose removing its block.">
+        <form method="post" action="/memory/{{ record.id }}/action" data-confirm="Archive this record? sync will propose removing its block."><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="action" value="archive">
           <button class="button button-ghost" type="submit">Archive</button>
         </form>
-        <form method="post" action="/memory/{{ record.id }}/action" data-confirm="Forget this record? sync will propose deleting it.">
+        <form method="post" action="/memory/{{ record.id }}/action" data-confirm="Forget this record? sync will propose deleting it."><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="action" value="forget">
           <button class="button button-danger" type="submit">Forget</button>
         </form>
@@ -57,7 +57,7 @@
     </div>
 
     {% if view.sensitivity != 'secret' %}
-      <form class="edit-form" method="post" action="/memory/{{ record.id }}/action">
+      <form class="edit-form" method="post" action="/memory/{{ record.id }}/action"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="action" value="edit">
         <label for="claim">Edit canonical claim</label>
         <div class="input-row">
@@ -80,8 +80,8 @@
           <p>{{ f.title | short(120) }}</p>
           <p class="muted">{{ f.detail | short(180) }}</p>
           <div class="actions">
-            <form method="post" action="/findings/{{ f.id }}/approve"><button class="button button-ghost" type="submit">Approve</button></form>
-            <form method="post" action="/findings/{{ f.id }}/reject"><button class="button button-ghost" type="submit">Dismiss</button></form>
+            <form method="post" action="/findings/{{ f.id }}/approve"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button button-ghost" type="submit">Approve</button></form>
+            <form method="post" action="/findings/{{ f.id }}/reject"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button button-ghost" type="submit">Dismiss</button></form>
           </div>
         </div>
       {% else %}

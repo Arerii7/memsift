@@ -20,7 +20,7 @@ from .export import export_json, export_markdown
 from .ingest.markdown import discover_markdown_files, ingest_markdown
 from .ingest.opencode import default_opencode_db, ingest_opencode
 from .models import Event, Finding, MemoryRecord
-from .normalize import date_only, human_age, redact_text
+from .normalize import date_only, human_age, redact_diff, redact_text
 from .sync import apply_sync, plan_sync, rollback_event
 
 console = Console()
@@ -472,9 +472,11 @@ def review(
 
     from .web.app import create_app
 
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        _fail("review is limited to localhost addresses")
     cfg = _config()
     cfg.ensure_dirs()
-    url = f"http://{host}:{port}"
+    url = f"http://{'[::1]' if host == '::1' else host}:{port}"
     console.print(Panel.fit(f"memsift review · {url}", style="cyan"))
     console.print("[dim]Ctrl+C to stop[/dim]")
     if not no_open:
@@ -590,7 +592,7 @@ def sync(
                     {
                         "changed": True,
                         "memory_ids": plan.memory_ids,
-                        "diff": plan.diff_text(),
+                        "diff": redact_diff(plan.diff_text()),
                         "skipped": plan.skipped,
                     },
                     ensure_ascii=False,
@@ -600,7 +602,7 @@ def sync(
             return
         if not json_output:
             console.print("[bold]Sync preview[/bold]")
-            console.print(plan.diff_text(), markup=False, highlight=False)
+            console.print(redact_diff(plan.diff_text()), markup=False, highlight=False)
         if not apply:
             console.print("[yellow]dry run[/yellow] — run `memsift sync --apply` to write")
             return

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -117,3 +118,140 @@ def test_sync_skips_file_edited_since_scan(conn, cfg: Config, dirty_project: Pat
     assert not plan.changed
     assert any("changed since" in message for message in plan.skipped)
     assert target.read_text(encoding="utf-8") == edited
+
+
+def test_anchor_fenced_memory_is_recognized_on_rescan(tmp_path: Path, cfg: Config) -> None:
+    target = tmp_path / "MEMORY.md"
+    target.write_text("```memory\nUse SQLite.\n```\n", encoding="utf-8")
+    assert add_anchors(target, config=cfg, apply=True).count == 1
+    records, blocks = parse_markdown_blocks(target, tmp_path)
+    assert len(records) == 1
+    assert records[0].claim == "Use SQLite."
+    assert blocks[0].anchored
+
+
+def test_anchor_backup_is_private_when_backup_parent_is_public(clean_project: Path, cfg: Config) -> None:
+    import stat
+
+    cfg.backups_dir.chmod(0o755)
+    result = add_anchors(clean_project, config=cfg, apply=True)
+    assert stat.S_IMODE(result.backup.stat().st_mode) == 0o700
+
+
+def test_sync_commit_failure_restores_source(conn, cfg: Config, dirty_project: Path) -> None:
+    import sqlite3
+
+    class FailingCommit:
+        def __getattr__(self, name):
+            return getattr(conn, name)
+
+        def commit(self):
+            raise sqlite3.OperationalError("disk full")
+
+    ingest_markdown(conn, [dirty_project], cfg)
+    actions.archive_memory(conn, "ms_anchor_dup")
+    conn.commit()
+    target = dirty_project / "MEMORY.md"
+    before = target.read_bytes()
+    with pytest.raises(sqlite3.OperationalError):
+        apply_sync(FailingCommit(), plan_sync(conn), cfg)
+    assert target.read_bytes() == before
+
+
+def test_rollback_refuses_to_discard_new_pending_edit(conn, cfg: Config, dirty_project: Path) -> None:
+    ingest_markdown(conn, [dirty_project], cfg)
+    actions.edit_memory(conn, "ms_anchor_dup", claim="First edit")
+    conn.commit()
+    result = apply_sync(conn, plan_sync(conn), cfg)
+    actions.edit_memory(conn, "ms_anchor_dup", claim="Second edit")
+    conn.commit()
+    with pytest.raises(ValueError, match="pending"):
+        rollback_event(conn, result.event_id)
+    assert db.get_memory(conn, "ms_anchor_dup").claim == "Second edit"
+    assert db.get_memory(conn, "ms_anchor_dup").sync_action == "update"
+
+
+def test_sync_and_rollback_preserve_crlf_bytes(conn, cfg: Config, tmp_path: Path) -> None:
+    target = tmp_path / "MEMORY.md"
+    original = b"# Facts\r\n\r\n<!-- memsift:id=a -->\r\n- Old.\r\n<!-- /memsift:id=a -->\r\n\r\n- Keep.\r\n"
+    target.write_bytes(original)
+    ingest_markdown(conn, [target], cfg)
+    actions.archive_memory(conn, "a")
+    conn.commit()
+    result = apply_sync(conn, plan_sync(conn), cfg)
+    conn.commit()
+    assert target.read_bytes() == b"# Facts\r\n\r\n- Keep.\r\n"
+    rollback_event(conn, result.event_id)
+    assert target.read_bytes() == original
+
+
+def test_rollback_refuses_file_edited_after_sync(conn, cfg: Config, dirty_project: Path) -> None:
+    ingest_markdown(conn, [dirty_project], cfg)
+    actions.archive_memory(conn, "ms_anchor_dup")
+    conn.commit()
+    result = apply_sync(conn, plan_sync(conn), cfg)
+    conn.commit()
+    target = dirty_project / "MEMORY.md"
+    edited = target.read_bytes() + b"Manual edit\n"
+    target.write_bytes(edited)
+    with pytest.raises(ValueError, match="changed"):
+        rollback_event(conn, result.event_id)
+    assert target.read_bytes() == edited
+
+
+def test_failed_sync_restores_file_when_database_write_fails(conn, cfg: Config, dirty_project: Path) -> None:
+    target = dirty_project / "MEMORY.md"
+    original = target.read_bytes()
+    ingest_markdown(conn, [dirty_project], cfg)
+    actions.archive_memory(conn, "ms_anchor_dup")
+    conn.commit()
+    with patch("memsift.sync.db.upsert_source_file", side_effect=OSError("disk error")), pytest.raises(OSError):
+        apply_sync(conn, plan_sync(conn), cfg)
+    assert target.read_bytes() == original
+
+
+def test_rollback_restores_memory_in_index(conn, cfg: Config, dirty_project: Path) -> None:
+    ingest_markdown(conn, [dirty_project], cfg)
+    actions.archive_memory(conn, "ms_anchor_dup")
+    conn.commit()
+    result = apply_sync(conn, plan_sync(conn), cfg)
+    conn.commit()
+    rollback_event(conn, result.event_id)
+    conn.commit()
+    ingest_markdown(conn, [dirty_project], cfg)
+    assert db.get_memory(conn, "ms_anchor_dup").status == "active"
+
+
+def test_rollback_restores_previous_edited_claim(conn, cfg: Config, tmp_path: Path) -> None:
+    target = tmp_path / "MEMORY.md"
+    original = b"<!-- memsift:id=a -->\r\n- Old.\r\n<!-- /memsift:id=a -->\r\n"
+    target.write_bytes(original)
+    ingest_markdown(conn, [target], cfg)
+    actions.edit_memory(conn, "a", claim="New.")
+    conn.commit()
+    result = apply_sync(conn, plan_sync(conn), cfg)
+    conn.commit()
+    assert target.read_bytes() == original.replace(b"Old.", b"New.")
+    rollback_event(conn, result.event_id)
+    assert db.get_memory(conn, "a").claim == "Old."
+    assert target.read_bytes() == original
+
+
+def test_failed_sync_event_restores_file(conn, cfg: Config, dirty_project: Path) -> None:
+    target = dirty_project / "MEMORY.md"
+    original = target.read_bytes()
+    ingest_markdown(conn, [dirty_project], cfg)
+    actions.archive_memory(conn, "ms_anchor_dup")
+    conn.commit()
+    with patch("memsift.sync.db.insert_event", side_effect=OSError("disk error")), pytest.raises(OSError):
+        apply_sync(conn, plan_sync(conn), cfg)
+    assert target.read_bytes() == original
+
+
+def test_sync_backup_directory_is_private(conn, cfg: Config, dirty_project: Path) -> None:
+    cfg.backups_dir.chmod(0o755)
+    ingest_markdown(conn, [dirty_project], cfg)
+    actions.archive_memory(conn, "ms_anchor_dup")
+    conn.commit()
+    result = apply_sync(conn, plan_sync(conn), cfg)
+    assert result.backup_dir.stat().st_mode & 0o777 == 0o700

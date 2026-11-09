@@ -65,7 +65,7 @@ def run_detectors(conn: sqlite3.Connection, config: Config | None = None) -> Det
             db.update_memory_fields(conn, record.id, status="active")
     records = db.all_memories(conn)
     candidates: list[MemoryRecord] = [
-        record for record in records if record.status not in {"archived", "forgotten", "rejected"}
+        record for record in records if record.source_present and record.status not in {"archived", "forgotten", "rejected"}
     ]
     memories = [record for record in candidates if record.block_kind != "instruction_command"]
 
@@ -74,7 +74,7 @@ def run_detectors(conn: sqlite3.Connection, config: Config | None = None) -> Det
     detected.extend(detect_duplicates(memories))
     detected.extend(detect_conflicts(memories))
     detected.extend(detect_stale(memories, ttl_days=cfg.ttl_days))
-    detected.extend(detect_orphans(memories))
+    detected.extend(detect_orphans([record for record in records if record.block_kind != "instruction_command"]))
     detected.extend(detect_secrets(candidates))
     detected.extend(detect_missing_scripts(candidates))
 

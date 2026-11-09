@@ -87,3 +87,11 @@ Status: v0.1.0 vertical slice complete and verified on 2026-11-10.
 - [x] Show discovered memory files and skipped hidden directories.
 - [x] Add CLI search over indexed memories with redacted output.
 - [x] Show instruction file sizes and line counts in source inventory.
+
+## Follow-up — Audit fixes
+
+- [x] Protect local web actions and redact sync previews.
+- [x] Restrict access to the local index and backups.
+- [x] Preserve files and index during sync failures and rollback.
+- [x] Reconcile changed Markdown records and distinguish projects.
+- [x] Correct anchored fenced memory and npm command punctuation.

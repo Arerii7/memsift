@@ -103,6 +103,7 @@ def add_anchors(
     total = 0
     all_diffs: list[str] = []
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    backup_dir: Path | None = None
     for file_path in files:
         try:
             original = file_path.read_text(encoding="utf-8")
@@ -125,7 +126,10 @@ def add_anchors(
         )
         if apply:
             cfg.ensure_dirs()
-            backup_dir = cfg.backups_dir / "anchors" / stamp
+            if backup_dir is None:
+                anchor_backups = cfg.backups_dir / "anchors"
+                anchor_backups.mkdir(parents=True, exist_ok=True)
+                backup_dir = Path(tempfile.mkdtemp(prefix=f"{stamp}-", dir=anchor_backups))
             backup = backup_dir / str(file_path.resolve()).lstrip("/")
             backup.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(file_path, backup)

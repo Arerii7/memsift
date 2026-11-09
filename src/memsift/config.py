@@ -34,8 +34,11 @@ class Config:
         return self.home / "backups"
 
     def ensure_dirs(self) -> None:
-        self.home.mkdir(parents=True, exist_ok=True)
-        self.backups_dir.mkdir(parents=True, exist_ok=True)
+        self.home.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if self.backups_dir.is_symlink():
+            raise OSError(f"backup directory is a symbolic link: {self.backups_dir}")
+        self.backups_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self.backups_dir.chmod(0o700)
 
     def add_source(self, kind: str, path: Path) -> bool:
         resolved = str(path.expanduser().resolve())

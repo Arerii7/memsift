@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .. import db
 from ..config import Config, project_scope
-from ..models import MemoryRecord, now_ms
+from ..models import MemoryRecord, now_ms, stable_id
 from ..normalize import (
     clean_claim,
     extract_file_refs,
@@ -215,6 +215,26 @@ def parse_blocks(text: str, *, filename: str = "", relpath: str = "") -> list[Ma
             j = i + 1
             changed_directory = False
             while j < len(lines) and not lines[j].strip().startswith("```"):
+                anchor = START_ANCHOR.match(lines[j]) if lang in {"memory", "memories", "memsift"} else None
+                if anchor:
+                    end = j + 1
+                    while end < len(lines) and not lines[end].strip().startswith("```") and not END_ANCHOR.match(lines[end]):
+                        end += 1
+                    closing = END_ANCHOR.match(lines[end]) if end < len(lines) else None
+                    content = _trim_body(lines[j + 1:end])
+                    explicit_id = anchor.group("id")
+                    if closing and closing.group("id") == explicit_id and content and explicit_id not in seen_ids:
+                        first = next(k for k in range(j + 1, end) if lines[k].strip())
+                        blocks.append(MarkdownBlock(
+                            claim=clean_claim(content[0]), body="\n".join(content),
+                            start_line=j, end_line=end + 1, content_start=first,
+                            content_end=first + len(content), kind="line",
+                            heading=" / ".join(item[1] for item in heading_stack),
+                            explicit_id=explicit_id, explicit=True, line_no=first + 1,
+                        ))
+                        seen_ids.add(explicit_id)
+                        j = end + 1
+                        continue
                 changed_directory = changed_directory or bool(re.search(r"\bcd\s+", lines[j]))
                 instruction_command = (
                     filename.lower() in {"agents.md", "claude.md"}
@@ -450,7 +470,12 @@ def ingest_markdown(
 ) -> IngestStats:
     stats = IngestStats()
     seen_records: set[str] = set()
+    processed_files: set[Path] = set()
     existing_paths: list[Path] = []
+    old_ids_by_path: dict[str, set[str]] = {}
+    for record in db.all_memories(conn):
+        if record.source_kind == "markdown":
+            old_ids_by_path.setdefault(record.source_ref.rsplit(":", 1)[0], set()).add(record.id)
     for raw_path in paths:
         path = raw_path.expanduser().resolve()
         if not path.exists():
@@ -461,21 +486,60 @@ def ingest_markdown(
         if path.is_dir() and not files:
             stats.errors.append(f"no Markdown files under: {path}")
         for file_path in files:
+            if file_path in processed_files:
+                continue
+            processed_files.add(file_path)
             existing_paths.append(file_path)
             try:
-                records, _blocks = parse_markdown_blocks(file_path, root)
+                records, blocks = parse_markdown_blocks(file_path, root)
             except OSError as exc:
                 stats.errors.append(f"{file_path}: {exc}")
                 continue
             stats.files += 1
             stats.paths.append(file_path)
+            explicit_ids = {block.explicit_id for block in blocks if block.explicit_id}
+            found_ids: set[str] = set()
             for record in records:
+                existing = db.get_memory(conn, record.id)
+                if existing and existing.source_ref.rsplit(":", 1)[0] != str(file_path):
+                    if record.id in explicit_ids:
+                        old_path = Path(existing.source_ref.rsplit(":", 1)[0])
+                        try:
+                            old_text = old_path.read_text(encoding="utf-8", errors="replace")
+                        except FileNotFoundError:
+                            old_text = ""
+                        except OSError as exc:
+                            stats.errors.append(f"{file_path}: cannot verify previous anchor at {old_path}: {exc}")
+                            stats.skipped += 1
+                            continue
+                        if any(
+                            (match := START_ANCHOR.match(line)) and match.group("id") == record.id
+                            for line in old_text.splitlines()
+                        ):
+                            stats.errors.append(f"{file_path}: duplicate anchor id {record.id} already used by {existing.source_ref}")
+                            stats.skipped += 1
+                            continue
+                    else:
+                        record.id = stable_id("ms", "markdown", str(file_path), record.id)
+                        existing = db.get_memory(conn, record.id)
+                        if existing and existing.source_ref.rsplit(":", 1)[0] != str(file_path):
+                            stats.errors.append(f"{file_path}: memory id collision {record.id}")
+                            stats.skipped += 1
+                            continue
+                found_ids.add(record.id)
                 if record.id in seen_records:
                     stats.skipped += 1
                     continue
                 seen_records.add(record.id)
                 db.upsert_memory(conn, record)
                 stats.records += 1
+            missing_ids = old_ids_by_path.get(str(file_path), set()) - found_ids
+            conn.executemany(
+                "UPDATE memories SET source_present = 0, status = CASE "
+                "WHEN status IN ('archived', 'forgotten', 'rejected') THEN status ELSE 'orphan' END "
+                "WHERE id = ? AND substr(source_ref, 1, length(?)) = ?",
+                [(item, f"{file_path}:", f"{file_path}:") for item in missing_ids],
+            )
     _source_lines(conn, existing_paths)
     if mark_missing and existing_paths:
         db.delete_missing_markdown_records(conn, existing_paths=existing_paths)

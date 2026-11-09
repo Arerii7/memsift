@@ -42,8 +42,8 @@
 
   <div class="card">
     <h2>Unified diff</h2>
-    <pre class="diff">{{ plan.diff_text() }}</pre>
-    <form class="actions" method="post" action="/sync/apply">
+    <pre class="diff">{{ plan.diff_text() | redact_diff }}</pre>
+    <form class="actions" method="post" action="/sync/apply"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label class="check"><input type="checkbox" name="confirm" value="yes" required> I reviewed this diff and want to write these files.</label>
       <button class="button button-accent" type="submit">Apply sync</button>
     </form>

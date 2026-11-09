@@ -19,7 +19,7 @@ def detect_missing_scripts(records: list[MemoryRecord]) -> list[Finding]:
         if path.name.lower() not in {"agents.md", "claude.md"}:
             continue
         scripts = {
-            match.group(1)
+            match.group(1).rstrip(".")
             for line in record.body.splitlines()
             if not re.search(r"\bcd\s+", line)
             for match in SCRIPT.finditer(line)
@@ -40,7 +40,7 @@ def detect_missing_scripts(records: list[MemoryRecord]) -> list[Finding]:
             continue
         for script in sorted(scripts - available.keys()):
             safe_script = redact_text(script)
-            match = next(m for m in SCRIPT.finditer(record.body) if m.group(1) == script)
+            match = next(m for m in SCRIPT.finditer(record.body) if m.group(1).rstrip(".") == script)
             base_line = int(record.source_ref.rsplit(":", 1)[1])
             line = base_line + record.body[:match.start()].count("\n")
             findings.append(Finding(

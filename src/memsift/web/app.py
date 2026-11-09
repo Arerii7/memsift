@@ -1,20 +1,22 @@
 from __future__ import annotations
 
+import secrets
 import sqlite3
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .. import __version__, actions, db
 from ..config import Config
 from ..export import export_markdown
 from ..models import MemoryRecord
-from ..normalize import date_only, human_age, redact_text
+from ..normalize import date_only, human_age, redact_diff, redact_text
 from ..sync import apply_sync, plan_sync
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -57,10 +59,24 @@ def create_app(home: Path | None = None) -> FastAPI:
     cfg = Config.load(home)
     cfg.ensure_dirs()
     app = FastAPI(title="memsift review", version=__version__, docs_url=None, redoc_url=None)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "[::1]"])
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+    csrf_token = secrets.token_urlsafe(32)
+    templates.env.globals["csrf_token"] = csrf_token
+
+    @app.middleware("http")
+    async def protect_forms(request: Request, call_next):
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            await request.body()
+            form = await request.form()
+            supplied = form.get("csrf_token", "")
+            if not isinstance(supplied, str) or not secrets.compare_digest(supplied, csrf_token):
+                return PlainTextResponse("Invalid or missing form token", status_code=403)
+        return await call_next(request)
     templates.env.filters["redact"] = redact_text
+    templates.env.filters["redact_diff"] = redact_diff
     templates.env.filters["short"] = _short
     templates.env.filters["date"] = date_only
     templates.env.filters["age"] = human_age

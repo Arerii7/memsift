@@ -92,6 +92,9 @@ memory blocks. The command is non-destructive and makes a backup first.
 - Every write is backed up under `.memsift/backups/<timestamp>/`.
 - Writes are atomic (temp file + rename).
 - `memsift rollback <event>` restores exact bytes.
+- Rollback refuses to overwrite a file edited since sync. Older sync events
+  without a saved post-sync hash cannot be rolled back automatically; their
+  backup files remain available in the recorded backup directory.
 - Secrets are redacted in the UI/JSON and excluded from export.
 - No network calls are made by the core pipeline.
 
