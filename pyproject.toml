@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "memsift"
 version = "0.1.0"
-description = "Find, review, and safely clean junk in AI-agent memory."
+description = "Find and review problems in coding agents' memory."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"

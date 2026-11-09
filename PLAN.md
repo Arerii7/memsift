@@ -96,3 +96,8 @@ Status: v0.1.0 vertical slice complete and verified on 2026-11-10.
 - [x] Reconcile changed Markdown records and distinguish projects.
 - [x] Correct anchored fenced memory and npm command punctuation.
 - [x] Avoid reassigning decisions when identical unanchored records are removed.
+
+## Follow-up — Repository presentation
+
+- [x] Document the preview release, safe first run, and contribution workflow.
+- [x] Ignore local credentials and development artifacts.
