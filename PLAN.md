@@ -80,3 +80,10 @@ Status: v0.1.0 vertical slice complete and verified on 2026-11-10.
 ## Follow-up — Safe sync
 
 - [x] Skip files changed since scanning and refuse stale sync plans.
+
+## Follow-up — Practical discovery and review
+
+- [x] Detect missing `npm run` scripts in instruction files without executing commands.
+- [x] Show discovered memory files and skipped hidden directories.
+- [x] Add CLI search over indexed memories with redacted output.
+- [x] Show instruction file sizes and line counts in source inventory.

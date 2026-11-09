@@ -88,7 +88,7 @@ class MarkdownBlock:
         return bool(self.explicit_id)
 
 
-def discover_markdown_files(path: Path) -> list[Path]:
+def discover_markdown_files(path: Path, *, skipped: list[Path] | None = None) -> list[Path]:
     path = path.expanduser().resolve()
     if path.is_file():
         return [path] if path.suffix.lower() in {".md", ".markdown", ".mdx"} else []
@@ -96,6 +96,8 @@ def discover_markdown_files(path: Path) -> list[Path]:
         return []
     found: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(path):
+        if skipped is not None:
+            skipped.extend(Path(dirpath) / name for name in dirnames if name.startswith(".") and name != ".opencode")
         dirnames[:] = [
             name
             for name in dirnames
@@ -105,6 +107,9 @@ def discover_markdown_files(path: Path) -> list[Path]:
         # Outside .opencode/memory, hidden subtrees are not memory.
         current = Path(dirpath)
         parts = current.relative_to(path).parts if current != path else ()
+        if parts and parts[-1] == ".opencode":
+            dirnames[:] = [name for name in dirnames if name == "memory"]
+            continue
         if ".opencode" in parts and "memory" not in parts:
             dirnames[:] = []
             continue
@@ -208,8 +213,16 @@ def parse_blocks(text: str, *, filename: str = "", relpath: str = "") -> list[Ma
         if stripped.startswith("```"):
             lang = stripped[3:].strip().lower()
             j = i + 1
+            changed_directory = False
             while j < len(lines) and not lines[j].strip().startswith("```"):
-                if lang in {"memory", "memories", "memsift"} and lines[j].strip():
+                changed_directory = changed_directory or bool(re.search(r"\bcd\s+", lines[j]))
+                instruction_command = (
+                    filename.lower() in {"agents.md", "claude.md"}
+                    and lang in {"", "bash", "sh", "shell"}
+                    and not changed_directory
+                    and re.search(r"\bnpm\s+run\s+[\w:.-]+", lines[j])
+                )
+                if (lang in {"memory", "memories", "memsift"} and lines[j].strip()) or instruction_command:
                     body = lines[j].strip()
                     blocks.append(
                         MarkdownBlock(
@@ -219,7 +232,7 @@ def parse_blocks(text: str, *, filename: str = "", relpath: str = "") -> list[Ma
                             end_line=j + 1,
                             content_start=j,
                             content_end=j + 1,
-                            kind="line",
+                            kind="instruction_command" if instruction_command else "line",
                             heading=" / ".join(item[1] for item in heading_stack),
                             explicit=True,
                             line_no=j + 1,

@@ -9,6 +9,7 @@ from ..config import Config
 from ..models import Finding, MemoryRecord, now_ms
 from .conflicts import detect_conflicts
 from .duplicates import detect_duplicates
+from .npm_scripts import detect_missing_scripts
 from .orphans import detect_orphans
 from .sensitive import detect_secrets
 from .stale import detect_stale
@@ -66,14 +67,16 @@ def run_detectors(conn: sqlite3.Connection, config: Config | None = None) -> Det
     candidates: list[MemoryRecord] = [
         record for record in records if record.status not in {"archived", "forgotten", "rejected"}
     ]
+    memories = [record for record in candidates if record.block_kind != "instruction_command"]
 
     db.prepare_findings(conn)
     detected: list[Finding] = []
-    detected.extend(detect_duplicates(candidates))
-    detected.extend(detect_conflicts(candidates))
-    detected.extend(detect_stale(candidates, ttl_days=cfg.ttl_days))
-    detected.extend(detect_orphans(candidates))
+    detected.extend(detect_duplicates(memories))
+    detected.extend(detect_conflicts(memories))
+    detected.extend(detect_stale(memories, ttl_days=cfg.ttl_days))
+    detected.extend(detect_orphans(memories))
     detected.extend(detect_secrets(candidates))
+    detected.extend(detect_missing_scripts(candidates))
 
     findings: list[Finding] = []
     for finding in detected:

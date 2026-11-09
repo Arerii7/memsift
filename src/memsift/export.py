@@ -15,6 +15,7 @@ def _clean_records(conn: sqlite3.Connection, scope: str | None = None) -> list[M
         record
         for record in records
         if record.status == "active" and record.sensitivity != "secret"
+        and record.block_kind != "instruction_command"
     ]
 
 

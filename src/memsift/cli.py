@@ -17,7 +17,7 @@ from .anchor import add_anchors
 from .config import Config
 from .detect import run_detectors
 from .export import export_json, export_markdown
-from .ingest.markdown import ingest_markdown
+from .ingest.markdown import discover_markdown_files, ingest_markdown
 from .ingest.opencode import default_opencode_db, ingest_opencode
 from .models import Event, Finding, MemoryRecord
 from .normalize import date_only, human_age, redact_text
@@ -290,6 +290,74 @@ def _count_findings(findings: list[Finding]) -> dict[str, int]:
     for finding in findings:
         result[finding.kind] = result.get(finding.kind, 0) + 1
     return result
+
+
+@app.command()
+def sources(
+    path: Optional[Path] = typer.Option(None, "--path", "-p", help="Inspect this Markdown file or directory."),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """List discoverable Markdown files, their sizes, and skipped hidden directories."""
+    roots = [path] if path else [Path(s["path"]) for s in _config().sources if s["kind"] == "markdown"]
+    if not roots:
+        _fail("no Markdown sources; use --path or register a source with init")
+    files: dict[str, dict[str, object]] = {}
+    skipped: set[str] = set()
+    errors = []
+    for root in roots:
+        root = root.expanduser()
+        if not root.exists():
+            errors.append(f"path not found: {root}")
+            continue
+        ignored: list[Path] = []
+        for file in discover_markdown_files(root, skipped=ignored):
+            try:
+                content = file.read_bytes()
+            except OSError as exc:
+                errors.append(f"{file}: {exc}")
+                continue
+            files[str(file)] = {"path": redact_text(str(file)), "bytes": len(content), "lines": len(content.splitlines())}
+        skipped.update(redact_text(str(item)) for item in ignored)
+    result = {"files": list(files.values()), "skipped_directories": sorted(skipped), "errors": [redact_text(e) for e in errors]}
+    if json_output:
+        typer.echo(jsonlib.dumps(result, ensure_ascii=False, indent=2))
+        return
+    table = Table(title="Discovered Markdown sources")
+    table.add_column("file")
+    table.add_column("lines", justify="right")
+    table.add_column("bytes", justify="right")
+    for item in result["files"]:
+        table.add_row(str(item["path"]), str(item["lines"]), str(item["bytes"]))
+    console.print(table)
+    for item in result["skipped_directories"]:
+        console.print(f"Skipped hidden directory: {item}", markup=False)
+    for item in result["errors"]:
+        console.print(f"Error: {item}", markup=False)
+
+
+@app.command()
+def search(
+    query: str = typer.Argument(..., help="Words to find in indexed memories."),
+    limit: int = typer.Option(50, "--limit", "-n", min=1, max=500),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Search indexed memories and show their source."""
+    conn = _connect(_config())
+    try:
+        records = db.search_memories(conn, query, limit=limit)
+    finally:
+        conn.close()
+    items = [{"id": r.id, "claim": redact_text(r.claim), "source_ref": redact_text(r.source_ref), "status": r.status} for r in records]
+    if json_output:
+        typer.echo(jsonlib.dumps(items, ensure_ascii=False, indent=2))
+        return
+    table = Table(title="Memory search")
+    for heading in ("id", "status", "claim", "source"):
+        table.add_column(heading)
+    for item in items:
+        table.add_row(item["id"], item["status"], item["claim"], item["source_ref"])
+    console.print(table)
+    console.print(f"{len(items)} record(s)")
 
 
 @app.command("list")

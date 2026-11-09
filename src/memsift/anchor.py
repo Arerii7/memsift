@@ -37,7 +37,7 @@ def anchor_text(text: str, path: Path, root: Path) -> tuple[str, int]:
     lines = text.splitlines()
     edits: list[tuple[int, int, list[str]]] = []
     for block in blocks:
-        if block.anchored:
+        if block.anchored or block.kind == "instruction_command":
             continue
         record = by_line.get(block.line_no)
         if record is None:

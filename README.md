@@ -70,6 +70,8 @@ memory blocks. The command is non-destructive and makes a backup first.
 | `memsift init` | create local database and config |
 | `memsift scan` | ingest sources + run detectors |
 | `memsift doctor` | print memory health report |
+| `memsift sources [--path DIR]` | list Markdown files, size and skipped hidden folders |
+| `memsift search QUERY` | search indexed memory and show its source |
 | `memsift list` | list memories by status/scope |
 | `memsift show ID` | show provenance, findings, history |
 | `memsift review` | open the local review UI |
@@ -92,6 +94,14 @@ memory blocks. The command is non-destructive and makes a backup first.
 - `memsift rollback <event>` restores exact bytes.
 - Secrets are redacted in the UI/JSON and excluded from export.
 - No network calls are made by the core pipeline.
+
+`doctor` also reports `npm run` scripts referenced in `AGENTS.md` or `CLAUDE.md`
+that are absent from the nearest `package.json`. It reads manifests but never
+executes commands; a missing or invalid manifest is not treated as a finding.
+Examples that change directories are skipped because their working directory
+cannot be inferred reliably.
+The `sources` command follows the same discovery rules as `scan`, and its
+counts describe files found on disk rather than the agent's effective context.
 
 ## Status
 
