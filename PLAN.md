@@ -76,3 +76,7 @@ Status: v0.1.0 vertical slice complete and verified on 2026-11-10.
 - Terminal statuses and finding decisions survive rescans; a changed source hash
   may produce a new finding id, which is treated as a new review item.
 - LLM judge is intentionally not implemented in v1.
+
+## Follow-up — Safe sync
+
+- [x] Skip files changed since scanning and refuse stale sync plans.

@@ -84,6 +84,12 @@ def plan_sync(conn: sqlite3.Connection) -> SyncPlan:
         except OSError as exc:
             plan.skipped.append(f"{path}: {exc}")
             continue
+        digest = hashlib.sha256(original.encode("utf-8")).hexdigest()
+        if any(record.source_hash != digest for record in records):
+            plan.skipped.append(
+                f"{path}: source file changed since scan; rescan and review pending changes"
+            )
+            continue
         blocks = parse_blocks(original, filename=path.name, relpath=path.name)
         by_id = {block.explicit_id: block for block in blocks if block.explicit_id}
         lines = original.splitlines()
@@ -163,6 +169,9 @@ def apply_sync(
     changed = [change for change in plan.changes if change.changed]
     if not changed:
         raise ValueError("nothing to sync")
+    for change in changed:
+        if change.path.read_text(encoding="utf-8") != change.original:
+            raise ValueError(f"source file changed since sync preview: {change.path}")
     cfg.ensure_dirs()
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     backup_dir = cfg.backups_dir / stamp

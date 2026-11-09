@@ -39,3 +39,17 @@ def test_cli_init_scan_doctor_list_show(home: Path, monkeypatch, dirty_project: 
     assert result.exit_code == 0, result.output
     assert "# memsift memory export" in result.output
     assert "sk-proj" not in result.output
+
+
+def test_sync_reports_skipped_changed_file(home: Path, monkeypatch, dirty_project: Path) -> None:
+    monkeypatch.setenv("MEMSIFT_HOME", str(home))
+    assert runner.invoke(app, ["init", "--path", str(dirty_project)]).exit_code == 0
+    assert runner.invoke(app, ["scan"]).exit_code == 0
+    assert runner.invoke(app, ["archive", "ms_anchor_dup"]).exit_code == 0
+    target = dirty_project / "MEMORY.md"
+    target.write_text(target.read_text(encoding="utf-8") + "\nManual edit.\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["sync"])
+
+    assert "changed since" in result.output
+    assert "Nothing approved to sync" not in result.output

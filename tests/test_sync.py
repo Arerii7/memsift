@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from memsift import actions, db
 from memsift.anchor import add_anchors
 from memsift.config import Config
@@ -83,3 +85,35 @@ def test_apply_without_changes_raises(conn, cfg: Config) -> None:
         assert "nothing to sync" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_sync_refuses_file_changed_after_preview(conn, cfg: Config, dirty_project: Path) -> None:
+    ingest_markdown(conn, [dirty_project], cfg)
+    actions.archive_memory(conn, "ms_anchor_dup")
+    conn.commit()
+    plan = plan_sync(conn)
+    target = dirty_project / "MEMORY.md"
+    edited = target.read_text(encoding="utf-8") + "\nA later manual edit.\n"
+    target.write_text(edited, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="changed"):
+        apply_sync(conn, plan, cfg)
+
+    assert target.read_text(encoding="utf-8") == edited
+    assert db.get_memory(conn, "ms_anchor_dup").sync_action == "delete"
+
+
+def test_sync_skips_file_edited_since_scan(conn, cfg: Config, dirty_project: Path) -> None:
+    ingest_markdown(conn, [dirty_project], cfg)
+    actions.archive_memory(conn, "ms_anchor_dup")
+    target = dirty_project / "MEMORY.md"
+    edited = target.read_text(encoding="utf-8").replace(
+        "We use SQLite for the app database.", "We use Postgres for the app database."
+    )
+    target.write_text(edited, encoding="utf-8")
+
+    plan = plan_sync(conn)
+
+    assert not plan.changed
+    assert any("changed since" in message for message in plan.skipped)
+    assert target.read_text(encoding="utf-8") == edited

@@ -513,7 +513,8 @@ def sync(
             for skipped in plan.skipped:
                 console.print(f"[yellow]skip:[/yellow] {skipped}")
         if not plan.changed:
-            console.print("[green]Nothing approved to sync.[/green]")
+            if not plan.skipped:
+                console.print("[green]Nothing approved to sync.[/green]")
             return
         if json_output and not apply:
             typer.echo(
