@@ -8,11 +8,15 @@ choose what to keep. Your index stays local; no account or cloud service needed.
 
 **Find. Review. Decide.** Source files change only after you approve a preview.
 
+![memsift dashboard showing findings from the included sample](docs/review-dashboard.png)
+
 ## Try it
 
 Requires Python 3.12 or newer and SQLite with FTS5.
 
 ```bash
+git clone https://github.com/Arerii7/memsift.git
+cd memsift
 python3 -m venv .venv
 .venv/bin/pip install -e .
 .venv/bin/memsift init --path tests/fixtures/dirty
