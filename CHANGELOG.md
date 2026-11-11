@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Redesigned the local review UI with a dark terminal/editorial theme, a
+  numbered rail, a segmented health meter, and responsive layouts down to
+  360px.
+
 ## [0.1.0] — 2026-11-11
 
 First public preview.

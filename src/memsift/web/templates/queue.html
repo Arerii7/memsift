@@ -1,25 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Queue · memsift{% endblock %}
 {% block content %}
-<div class="page-head">
+<header class="page-head">
   <div>
-    <p class="eyebrow">Review queue</p>
-    <h1>One decision at a time.</h1>
+    <h1>Review queue.</h1>
+    <p class="lede">Approve, dismiss, or open each finding. Nothing changes on disk until sync.</p>
   </div>
-  <div class="chips">
-    <a class="chip {{ 'selected' if not kind else '' }}" href="/queue">all</a>
-    {% for name in kinds %}
-      <a class="chip chip-{{ name }} {{ 'selected' if kind == name else '' }}" href="/queue?kind={{ name }}">{{ name }} <b>{{ counts.get(name, 0) }}</b></a>
-    {% endfor %}
+  <div class="page-meta">
+    <span class="meta-label">findings</span>
+    <span class="meta-value">{{ items | length }}</span>
   </div>
-</div>
+</header>
+
+<nav class="filter-bar" aria-label="Filter findings">
+  <a class="chip {{ 'selected' if not kind else '' }}" href="/queue">all</a>
+  {% for name in kinds %}
+    <a class="chip {{ 'selected' if kind == name else '' }}" href="/queue?kind={{ name }}">{{ name }} <b>{{ counts.get(name, 0) }}</b></a>
+  {% endfor %}
+</nav>
 
 {% if items %}
   <div class="queue">
     {% for item in items %}
       {% set f = item.finding %}
       {% set r = item.record %}
-      <article class="queue-card">
+      <article class="queue-item">
         <div class="queue-top">
           <span class="badge badge-{{ f.kind }}">{{ f.kind }}</span>
           <span class="score">score {{ '%.2f' | format(f.score) }}</span>
@@ -42,12 +47,14 @@
         <div class="actions">
           <a class="button" href="/memory/{{ f.memory_id }}">Review</a>
           {% if f.related_id and f.kind in ['duplicate', 'conflict'] %}
-            <a class="button button-accent" href="/merge?a={{ f.memory_id }}&b={{ f.related_id }}">Merge</a>
+            <a class="button button-primary" href="/merge?a={{ f.memory_id }}&b={{ f.related_id }}">Merge</a>
           {% endif %}
-          <form method="post" action="/findings/{{ f.id }}/approve" data-confirm="Approve this finding?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <form method="post" action="/findings/{{ f.id }}/approve" data-confirm="Approve this finding?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button class="button button-ghost" type="submit">Approve</button>
           </form>
-          <form method="post" action="/findings/{{ f.id }}/reject" data-confirm="Dismiss as a false positive?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <form method="post" action="/findings/{{ f.id }}/reject" data-confirm="Dismiss as a false positive?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button class="button button-ghost" type="submit">Dismiss</button>
           </form>
         </div>

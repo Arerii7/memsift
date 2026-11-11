@@ -32,10 +32,14 @@ def test_dashboard_and_queue_render(cfg: Config, dirty_project: Path) -> None:
     client = TestClient(create_app(home=cfg.home), base_url="http://localhost")
     dashboard = client.get("/")
     assert dashboard.status_code == 200
-    assert "Sift the signal" in dashboard.text
+    assert "Review your agent" in dashboard.text
+    assert 'aria-label="Memory health"' in dashboard.text
+    assert 'href="#main"' in dashboard.text
+    assert 'aria-current="page"' in dashboard.text
     queue = client.get("/queue")
     assert queue.status_code == 200
     assert "Review queue" in queue.text
+    assert 'aria-label="Filter findings"' in queue.text
     filtered = client.get("/queue?kind=conflict")
     assert filtered.status_code == 200
     health = client.get("/api/health")

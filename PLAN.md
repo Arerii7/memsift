@@ -111,3 +111,10 @@ Status: v0.1.0 vertical slice complete and verified on 2026-11-10.
 - [x] Release metadata, README badges, and complete sdist contents.
 - [x] Security policy, changelog, and platform support note.
 - [ ] Publish to PyPI (not requested yet).
+
+## Follow-up — Review UI redesign
+
+- [x] Dark terminal/editorial theme with a warm clay accent.
+- [x] Numbered left rail and segmented health meter.
+- [x] Responsive 360px layout, visible focus states, reduced motion.
+- [x] Dashboard, queue, detail, merge, sync, and settings screens.

@@ -3,36 +3,53 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0b0c0e">
+  <meta name="description" content="Local review UI for memsift, a memory hygiene tool for coding agents.">
   <title>{% block title %}memsift{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230b0c0e'/%3E%3Crect x='12' y='12' width='8' height='8' fill='%23e8703a'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
   <script defer src="{{ url_for('static', path='app.js') }}"></script>
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="/">
-      <span class="brand-mark">◈</span>
-      <span>memsift</span>
-    </a>
-    <nav>
-      <a href="/" class="{{ 'active' if active == 'dashboard' else '' }}">Dashboard</a>
-      <a href="/queue" class="{{ 'active' if active == 'queue' else '' }}">Queue</a>
-      <a href="/merge" class="{{ 'active' if active == 'merge' else '' }}">Merge</a>
-      <a href="/sync" class="{{ 'active' if active == 'sync' else '' }}">Sync</a>
-      <a href="/settings" class="{{ 'active' if active == 'settings' else '' }}">Settings</a>
-    </nav>
-    <span class="version">v{{ version }}</span>
-  </header>
+  <a class="skip" href="#main">Skip to content</a>
 
-  <main>
-    {% if error %}
-      <div class="alert alert-error">{{ error }}</div>
-    {% endif %}
-    {% block content %}{% endblock %}
-  </main>
+  <div class="shell">
+    <aside class="rail">
+      <div class="rail-head">
+        <a class="brand" href="/">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>memsift</span>
+        </a>
+        <p class="rail-sub">memory review</p>
+      </div>
 
-  <footer>
-    <span>local only · 127.0.0.1 · sources are read-only until sync</span>
-    <span>{{ cfg.home }}</span>
-  </footer>
+      <nav class="index" aria-label="Main">
+        <a href="/"{% if active == 'dashboard' %} aria-current="page"{% endif %}><span class="n">01</span><span>Dashboard</span></a>
+        <a href="/queue"{% if active == 'queue' %} aria-current="page"{% endif %}><span class="n">02</span><span>Queue</span></a>
+        <a href="/merge"{% if active == 'merge' %} aria-current="page"{% endif %}><span class="n">03</span><span>Merge</span></a>
+        <a href="/sync"{% if active == 'sync' %} aria-current="page"{% endif %}><span class="n">04</span><span>Sync</span></a>
+        <a href="/settings"{% if active == 'settings' %} aria-current="page"{% endif %}><span class="n">05</span><span>Settings</span></a>
+      </nav>
+
+      <div class="rail-foot">
+        <span class="rail-dot" aria-hidden="true"></span>
+        <span>local only</span>
+        <span>v{{ version }}</span>
+      </div>
+    </aside>
+
+    <main id="main">
+      {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
+      {% block content %}{% endblock %}
+
+      <footer>
+        <span>Source files change only after an approved sync.</span>
+        <span>127.0.0.1 · no network</span>
+      </footer>
+    </main>
+  </div>
 </body>
 </html>

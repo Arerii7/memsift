@@ -1,31 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Sync · memsift{% endblock %}
 {% block content %}
-<div class="page-head">
+<header class="page-head">
   <div>
-    <p class="eyebrow">Safe writes</p>
     <h1>Sync preview.</h1>
     <p class="lede">Only approved, anchored Markdown blocks change. Review the diff, then confirm.</p>
   </div>
   {% if pending %}
-    <span class="badge badge-action">{{ pending | length }} pending</span>
+    <div class="page-meta">
+      <span class="meta-label">pending</span>
+      <span class="meta-value">{{ pending | length }}</span>
+    </div>
   {% endif %}
-</div>
+</header>
 
 {% if applied %}
   <div class="alert alert-ok">Applied. Backup created and rollback event recorded: <code>{{ event }}</code></div>
 {% endif %}
 
 {% if plan.skipped %}
-  <div class="card">
-    <h2>Skipped</h2>
-    {% for item in plan.skipped %}<p class="muted">{{ item }}</p>{% endfor %}
-  </div>
+  <section class="section">
+    <div class="section-head"><h2>Skipped</h2></div>
+    <div class="skipped-list">
+      {% for item in plan.skipped %}<p>{{ item }}</p>{% endfor %}
+    </div>
+  </section>
 {% endif %}
 
 {% if plan.changed %}
-  <div class="card">
-    <div class="card-head">
+  <section class="section">
+    <div class="section-head">
       <h2>Changed files</h2>
       <span class="muted">{{ plan.changes | length }} file(s)</span>
     </div>
@@ -38,16 +42,20 @@
         </div>
       {% endfor %}
     </div>
-  </div>
+  </section>
 
-  <div class="card">
-    <h2>Unified diff</h2>
+  <section class="section">
+    <div class="diff-head">
+      <h2>Unified diff</h2>
+      <span class="muted">review before writing</span>
+    </div>
     <pre class="diff">{{ plan.diff_text() | redact_diff }}</pre>
-    <form class="actions" method="post" action="/sync/apply"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label class="check"><input type="checkbox" name="confirm" value="yes" required> I reviewed this diff and want to write these files.</label>
-      <button class="button button-accent" type="submit">Apply sync</button>
+    <form class="actions" method="post" action="/sync/apply">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="check" for="confirm"><input id="confirm" type="checkbox" name="confirm" value="yes" required> I reviewed this diff and want to write these files.</label>
+      <button class="button button-primary" type="submit">Apply sync</button>
     </form>
-  </div>
+  </section>
 {% else %}
   <div class="empty-state">
     <h2>Nothing pending.</h2>
@@ -56,13 +64,15 @@
   </div>
 {% endif %}
 
-<div class="card safety">
-  <h2>What apply does</h2>
-  <ul>
-    <li>Copies every changed file into <code>{{ cfg.backups_dir }}</code>.</li>
-    <li>Writes via temp file + fsync + rename.</li>
-    <li>Records a sync event with per-file backup paths.</li>
-    <li>Leaves every unapproved block untouched.</li>
-  </ul>
-</div>
+<section class="section">
+  <div class="section-head"><h2>What apply does</h2></div>
+  <div class="safety">
+    <ul>
+      <li>Copies every changed file into <code>{{ cfg.backups_dir }}</code>.</li>
+      <li>Writes via temp file, fsync, and rename.</li>
+      <li>Records a sync event with per-file backup paths.</li>
+      <li>Leaves every unapproved block untouched.</li>
+    </ul>
+  </div>
+</section>
 {% endblock %}
