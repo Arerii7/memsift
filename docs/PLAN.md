@@ -129,4 +129,8 @@ Status: v0.1.0 vertical slice complete and verified on 2026-11-10.
 - [x] Simplify repository presentation, ignore local artifacts, and organize internal docs.
 - [x] Verify lint, 110 tests (89.66% coverage), sdist/wheel, and installed web assets.
 - [x] Independent review: reject nested anchors inside memory fences; regression test added.
-- [ ] Publish the reviewed commit to GitHub: local git has no DNS access; the connected integration rejects writes with HTTP 403.
+- [x] Publish the reviewed commit to GitHub (3917a5d, master).
+
+## Follow-up — Current dashboard screenshot
+
+- [x] Refresh the README screenshot from the current UI in Firefox at 1440 × 1400 using synthetic demo data.
