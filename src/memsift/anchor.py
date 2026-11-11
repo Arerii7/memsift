@@ -110,7 +110,11 @@ def add_anchors(
         except OSError as exc:
             result.errors.append(f"{file_path}: {exc}")
             continue
-        updated, count = anchor_text(original, file_path, root)
+        try:
+            updated, count = anchor_text(original, file_path, root)
+        except ValueError as exc:
+            result.errors.append(f"{file_path}: {exc}")
+            continue
         if count == 0:
             continue
         total += count

@@ -24,8 +24,20 @@ dist/
 
 # Test and editor files
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
 .mypy_cache/
 .DS_Store
 .idea/
 .vscode/
+
+# Local agent settings, credentials, and temporary files
+.agents/
+.codex/
+.aws/
+.worktrees/
+*.memsift.tmp
+*.swp
+*.swo
+*~

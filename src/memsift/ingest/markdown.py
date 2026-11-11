@@ -176,12 +176,15 @@ def parse_blocks(text: str, *, filename: str = "", relpath: str = "") -> list[Ma
             j = i + 1
             end_marker = None
             while j < len(lines):
-                if END_ANCHOR.match(lines[j]):
+                closing = END_ANCHOR.match(lines[j])
+                if closing and closing.group("id") == explicit_id:
                     end_marker = j
                     break
-                if START_ANCHOR.match(lines[j]):
-                    break
+                if closing or START_ANCHOR.match(lines[j]):
+                    raise ValueError(f"invalid anchor pair for {explicit_id} at line {i + 1}")
                 j += 1
+            if end_marker is None:
+                raise ValueError(f"unclosed anchor {explicit_id} at line {i + 1}")
             raw_content = lines[i + 1 : (end_marker if end_marker is not None else j)]
             leading_blank = 0
             while leading_blank < len(raw_content) and not raw_content[leading_blank].strip():
@@ -189,7 +192,9 @@ def parse_blocks(text: str, *, filename: str = "", relpath: str = "") -> list[Ma
             content = _trim_body(raw_content)
             block_end = (end_marker + 1) if end_marker is not None else j
             i = max(block_end, i + 1)
-            if not content or explicit_id in seen_ids:
+            if explicit_id in seen_ids:
+                raise ValueError(f"duplicate anchor {explicit_id} at line {marker_index + 1}")
+            if not content:
                 continue
             seen_ids.add(explicit_id)
             content_start = marker_index + 1 + leading_blank
@@ -220,6 +225,8 @@ def parse_blocks(text: str, *, filename: str = "", relpath: str = "") -> list[Ma
                 if anchor:
                     end = j + 1
                     while end < len(lines) and not lines[end].strip().startswith("```") and not END_ANCHOR.match(lines[end]):
+                        if START_ANCHOR.match(lines[end]):
+                            raise ValueError(f"nested memory anchor at line {end + 1}")
                         end += 1
                     closing = END_ANCHOR.match(lines[end]) if end < len(lines) else None
                     content = _trim_body(lines[j + 1:end])
@@ -236,6 +243,7 @@ def parse_blocks(text: str, *, filename: str = "", relpath: str = "") -> list[Ma
                         seen_ids.add(explicit_id)
                         j = end + 1
                         continue
+                    raise ValueError(f"invalid memory anchor {explicit_id} at line {j + 1}")
                 changed_directory = changed_directory or bool(re.search(r"\bcd\s+", lines[j]))
                 instruction_command = (
                     filename.lower() in {"agents.md", "claude.md"}
@@ -493,7 +501,7 @@ def ingest_markdown(
             existing_paths.append(file_path)
             try:
                 records, blocks = parse_markdown_blocks(file_path, root)
-            except OSError as exc:
+            except (OSError, ValueError) as exc:
                 stats.errors.append(f"{file_path}: {exc}")
                 continue
             stats.files += 1

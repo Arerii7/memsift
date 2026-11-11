@@ -187,7 +187,7 @@ def create_app(home: Path | None = None) -> FastAPI:
     ) -> HTMLResponse:
         connection = conn()
         try:
-            records = db.list_memories(connection, limit=500)
+            records = db.all_memories(connection)
             by_id = {record.id: record for record in records}
             if (not a or not b) and records:
                 for finding in db.list_findings(connection, limit=500):
@@ -197,6 +197,8 @@ def create_app(home: Path | None = None) -> FastAPI:
                         break
             left = by_id.get(a or "")
             right = by_id.get(b or "")
+            if (a and left is None) or (b and right is None):
+                raise HTTPException(404, "memory not found")
             if left is None and right is None and records:
                 left, right = records[0], records[1] if len(records) > 1 else None
         finally:
@@ -241,6 +243,9 @@ def create_app(home: Path | None = None) -> FastAPI:
         try:
             actions.approve_finding(connection, finding_id)
             connection.commit()
+        except ValueError as exc:
+            connection.rollback()
+            raise HTTPException(404, "finding not found") from exc
         finally:
             connection.close()
         return RedirectResponse("/queue", status_code=303)
@@ -251,6 +256,9 @@ def create_app(home: Path | None = None) -> FastAPI:
         try:
             actions.reject_finding(connection, finding_id)
             connection.commit()
+        except ValueError as exc:
+            connection.rollback()
+            raise HTTPException(404, "finding not found") from exc
         finally:
             connection.close()
         return RedirectResponse("/queue", status_code=303)
@@ -312,12 +320,15 @@ def create_app(home: Path | None = None) -> FastAPI:
         return templates.TemplateResponse(request, "sync.html", context)
 
     @app.post("/sync/apply")
-    def sync_apply(confirm: str = Form("")) -> RedirectResponse:
+    def sync_apply(confirm: str = Form(""), preview_hash: str = Form("")) -> RedirectResponse:
         if confirm != "yes":
             return RedirectResponse("/sync?error=Please+confirm+the+write", status_code=303)
         connection = conn()
         try:
+            connection.execute("BEGIN IMMEDIATE")
             plan = plan_sync(connection)
+            if not secrets.compare_digest(preview_hash, plan.fingerprint()):
+                raise ValueError("Sync preview changed or expired. Review the current diff before applying.")
             if not plan.changed:
                 return RedirectResponse("/sync?error=Nothing+to+apply", status_code=303)
             result = apply_sync(connection, plan, cfg)

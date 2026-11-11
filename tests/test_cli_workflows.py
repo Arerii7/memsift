@@ -50,7 +50,7 @@ def test_sync_apply_and_rollback_workflow(home: Path, monkeypatch, dirty_project
 
 def test_record_action_commands(home: Path, monkeypatch, dirty_project: Path) -> None:
     _init_scan(home, monkeypatch, dirty_project)
-    ids = [str(record["id"]) for record in _records()]
+    ids = [str(record["id"]) for record in _records() if record["sensitivity"] != "secret"]
     assert len(ids) >= 6
 
     assert "pinned" in _invoke(["pin", ids[0]]).output

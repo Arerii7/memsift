@@ -46,6 +46,13 @@ def _format_claim(kind: str, claim: str) -> str:
     return claim
 
 
+def _updated_body(record: MemoryRecord, claim: str) -> str:
+    if claim == record.claim:
+        return record.body
+    _, separator, continuation = record.body.partition("\n")
+    return _format_claim(record.block_kind, claim) + separator + continuation
+
+
 def _sync_delete_action(record: MemoryRecord) -> str:
     return "delete" if record.source_kind == "markdown" else "none"
 
@@ -143,9 +150,9 @@ def edit_memory(
     record = get_or_raise(conn, memory_id)
     before = snapshot(record)
     new_claim = (claim if claim is not None else record.claim).strip()
-    new_body = body if body is not None else _format_claim(record.block_kind, new_claim)
-    if claim is not None and body is None:
-        new_body = _format_claim(record.block_kind, new_claim)
+    if record.sensitivity == "secret":
+        raise ValueError("Editing secret records is disabled; archive or forget the record instead.")
+    new_body = body if body is not None else _updated_body(record, new_claim)
     files = extract_file_refs(new_body)
     topic = infer_topic(new_body)
     sensitivity = sensitivity_for(new_body)
@@ -194,10 +201,12 @@ def merge_memories(
         raise ValueError("cannot merge a memory with itself")
     canonical = get_or_raise(conn, canonical_id)
     other = get_or_raise(conn, other_id)
+    if canonical.sensitivity == "secret" or other.sensitivity == "secret":
+        raise ValueError("Merging secret records is disabled; archive or forget the record instead.")
     before_canonical = snapshot(canonical)
     before_other = snapshot(other)
     new_claim = (claim or canonical.claim).strip()
-    new_body = _format_claim(canonical.block_kind, new_claim)
+    new_body = _updated_body(canonical, new_claim)
     files = extract_file_refs(new_body)
     topic = infer_topic(new_body)
     confidence = max(

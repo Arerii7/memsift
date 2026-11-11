@@ -118,3 +118,15 @@ Status: v0.1.0 vertical slice complete and verified on 2026-11-10.
 - [x] Numbered left rail and segmented health meter.
 - [x] Responsive 360px layout, visible focus states, reduced motion.
 - [x] Dashboard, queue, detail, merge, sync, and settings screens.
+
+## Follow-up — Review safety and repository cleanup
+
+- [x] Reject malformed anchors before sync can modify unrelated content.
+- [x] Bind web apply to the reviewed diff and reject stale previews.
+- [x] Protect secret records during merge and preserve multiline record bodies.
+- [x] Keep source hashes consistent across successive sync and rollback operations.
+- [x] Check review UI actions and copy; make merge selection explicit.
+- [x] Simplify repository presentation, ignore local artifacts, and organize internal docs.
+- [x] Verify lint, 110 tests (89.66% coverage), sdist/wheel, and installed web assets.
+- [x] Independent review: reject nested anchors inside memory fences; regression test added.
+- [ ] Publish the reviewed commit to GitHub: local git has no DNS access; the connected integration rejects writes with HTTP 403.

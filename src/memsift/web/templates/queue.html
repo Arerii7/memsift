@@ -4,7 +4,7 @@
 <header class="page-head">
   <div>
     <h1>Review queue.</h1>
-    <p class="lede">Approve, dismiss, or open each finding. Nothing changes on disk until sync.</p>
+    <p class="lede">Resolve or dismiss a finding, or open it to prepare a change. Resolving only closes the review item.</p>
   </div>
   <div class="page-meta">
     <span class="meta-label">findings</span>
@@ -49,9 +49,9 @@
           {% if f.related_id and f.kind in ['duplicate', 'conflict'] %}
             <a class="button button-primary" href="/merge?a={{ f.memory_id }}&b={{ f.related_id }}">Merge</a>
           {% endif %}
-          <form method="post" action="/findings/{{ f.id }}/approve" data-confirm="Approve this finding?">
+          <form method="post" action="/findings/{{ f.id }}/approve" data-confirm="Mark this finding as resolved? This does not change the source.">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="button button-ghost" type="submit">Approve</button>
+            <button class="button button-ghost" type="submit">Resolve</button>
           </form>
           <form method="post" action="/findings/{{ f.id }}/reject" data-confirm="Dismiss as a false positive?">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

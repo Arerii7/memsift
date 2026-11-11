@@ -52,12 +52,12 @@
           <button class="button button-ghost" type="submit">Restore</button>
         </form>
       {% else %}
-        <form method="post" action="/memory/{{ record.id }}/action" data-confirm="Archive this record? sync will propose removing its block.">
+        <form method="post" action="/memory/{{ record.id }}/action" data-confirm="Archive this record? For anchored Markdown, sync will propose removing its block.">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="action" value="archive">
           <button class="button button-ghost" type="submit">Archive</button>
         </form>
-        <form method="post" action="/memory/{{ record.id }}/action" data-confirm="Forget this record? sync will propose deleting it.">
+        <form method="post" action="/memory/{{ record.id }}/action" data-confirm="Forget this record? For anchored Markdown, sync will propose deleting its block.">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="action" value="forget">
           <button class="button button-danger" type="submit">Forget</button>
@@ -74,7 +74,7 @@
           <input id="claim" name="claim" value="{{ view.claim }}">
           <button class="button button-primary" type="submit">Save edit</button>
         </div>
-        <p class="hint">Saving sets <code>sync_action=update</code>. Nothing is written until sync.</p>
+        <p class="hint">Saving keeps the remaining body text. Markdown edits stay pending until sync. OpenCode edits affect only this local index.</p>
       </form>
     {% else %}
       <p class="hint">Editing is disabled while the record is classified as secret. Archive or forget it instead.</p>
@@ -91,20 +91,23 @@
         <div class="side-finding">
           <span class="badge badge-{{ f.kind }}">{{ f.kind }}</span>
           <p>{{ f.title | short(120) }}</p>
+          <span class="badge">{{ f.status }}</span>
           <p class="muted">{{ f.detail | short(180) }}</p>
+          {% if f.status == 'open' %}
           <div class="actions">
             <form method="post" action="/findings/{{ f.id }}/approve">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button class="button button-ghost" type="submit">Approve</button>
+              <button class="button button-ghost" type="submit">Resolve</button>
             </form>
             <form method="post" action="/findings/{{ f.id }}/reject">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <button class="button button-ghost" type="submit">Dismiss</button>
             </form>
           </div>
+          {% endif %}
         </div>
       {% else %}
-        <p class="empty">No open findings for this record.</p>
+        <p class="empty">No findings for this record.</p>
       {% endfor %}
     </section>
 

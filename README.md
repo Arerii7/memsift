@@ -1,18 +1,22 @@
 # memsift
 
-[![CI](https://github.com/Arerii7/memsift/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Arerii7/memsift/actions/workflows/ci.yml)
-![Coverage 89%](https://img.shields.io/badge/coverage-89%25-brightgreen)
-![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
+**Find the problems in your coding agent’s memory. Review every change.**
 
-> Keep coding agent memories tidy, consistent, and under your control.
+[![CI](https://github.com/Arerii7/memsift/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Arerii7/memsift/actions/workflows/ci.yml)
+![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+![Status: preview](https://img.shields.io/badge/status-preview-orange)
 
 memsift scans Markdown and explicit OpenCode memories for duplicates,
-conflicts, stale references, and possible secrets. Review what it finds, then
-choose what to keep. Your index stays local; no account or cloud service needed.
+conflicting instructions, stale references, and possible secrets. Review the
+findings in a local web interface, choose what to keep, and inspect the diff
+before writing changes.
 
-**Find. Review. Decide.** Source files change only after you approve a preview.
+No account, external assets, telemetry, or cloud calls. Your index stays local.
 
-![memsift dashboard showing findings from the included sample](https://raw.githubusercontent.com/Arerii7/memsift/master/docs/review-dashboard.png)
+[Quick start](#try-it) · [Checks](#what-it-checks) · [Safe writes](#review-and-write-changes) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+
+![Local review dashboard with synthetic sample findings](docs/review-dashboard.png)
 
 ## Try it
 
@@ -24,14 +28,17 @@ git clone https://github.com/Arerii7/memsift.git
 cd memsift
 python3 -m venv .venv
 .venv/bin/pip install -e .
+export MEMSIFT_HOME="$PWD/.memsift/demo"
 .venv/bin/memsift init --path tests/fixtures/dirty
 .venv/bin/memsift scan
 .venv/bin/memsift doctor
 .venv/bin/memsift review
 ```
 
-The sample uses a **synthetic** key to demonstrate secret redaction. `review`
-opens a local interface at `http://127.0.0.1:8787`; stop it with `Ctrl+C`.
+The demo keeps its index and backups in the ignored `.memsift/demo/` directory.
+It uses a **synthetic** key to demonstrate secret redaction. `review` starts
+the interface at `http://127.0.0.1:8787`; open that address in your browser and
+stop the server with `Ctrl+C`.
 
 > **Preview:** Try memsift on a copy of your files first and review every diff.
 
@@ -40,9 +47,17 @@ opens a local interface at `http://127.0.0.1:8787`; stop it with `Ctrl+C`.
 > index and backups can contain sensitive source content. See
 > [SECURITY.md](SECURITY.md) for the threat model and reporting process.
 
-To inspect another directory, use `.venv/bin/memsift scan --path /path/to/notes`.
-This also registers that path for future scans; add `--no-save` to scan it once.
-Run `.venv/bin/memsift --help` to see all commands.
+To start your own index in the default storage directory:
+
+```bash
+unset MEMSIFT_HOME
+.venv/bin/memsift init --path /path/to/notes
+.venv/bin/memsift scan
+.venv/bin/memsift review
+```
+
+Add a source with `.venv/bin/memsift scan --path /another/directory`; use
+`--no-save` to scan it once. Run `.venv/bin/memsift --help` for all commands.
 
 ## What it checks
 
@@ -84,6 +99,10 @@ Use `--db /path/to/opencode.db` to choose a different OpenCode database.
 
 Archiving, merging or editing a record in memsift does not immediately change
 the source file. `sync` first shows a preview; source writes require `--apply`.
+The web interface refuses an apply if its preview has changed. Resolving a
+finding only closes that review item; use edit, merge, archive, or forget to
+prepare a source change. Secret records cannot be edited or merged.
+
 Only Markdown blocks with matching memsift anchors can be changed:
 
 ```md
@@ -98,6 +117,9 @@ To preview anchors for a file or directory, then add them explicitly:
 .venv/bin/memsift anchor --path /path/to/notes
 .venv/bin/memsift anchor --path /path/to/notes --apply
 ```
+
+Malformed or duplicate anchors are rejected. Editing a claim or merging keeps
+the canonical record’s remaining body text.
 
 Adding anchors changes source files and creates backups. Review the preview
 before applying. After reviewing records and approving changes:
@@ -136,9 +158,13 @@ Tests use local fixtures and should not make network requests. CI runs the suite
 on Python 3.12–3.14 for Linux and on Python 3.12 for macOS. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for a short guide.
 
-## Changelog
+## Project documentation
 
-See [CHANGELOG.md](CHANGELOG.md).
+- [Changelog](CHANGELOG.md) — fixes and release history.
+- [Security](SECURITY.md) — storage, threat model, and vulnerability reports.
+- [Specification](docs/SPEC.md) — records, detectors, and sync rules.
+- [Design](docs/DESIGN.md) — interface layout and visual rules.
+- [Implementation plan](docs/PLAN.md) — completed work and follow-ups.
 
 ## License
 

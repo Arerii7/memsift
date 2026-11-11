@@ -3,11 +3,11 @@
 ## Mission
 
 Keep the project deterministic, safe, and easy for an AI agent to continue.
-The repository is the memory: update `PLAN.md` and tests with every slice.
+The repository is the memory: update `docs/PLAN.md` and tests with every slice.
 
 ## Rules
 
-1. Read `SPEC.md` and the current unchecked item in `PLAN.md` before coding.
+1. Read `docs/SPEC.md` and the current unchecked item in `docs/PLAN.md` before coding.
 2. Vertical slices only: database -> CLI/UI -> test -> demo -> commit.
 3. Never write to `~/.local/share/opencode/opencode.db` or any third-party store.
 4. `memsift sync` defaults to dry-run. No source file changes without approval.
@@ -38,5 +38,5 @@ The repository is the memory: update `PLAN.md` and tests with every slice.
 
 - tests pass; ruff passes;
 - behavior is demonstrated with a command;
-- `PLAN.md` checkbox updated;
+- `docs/PLAN.md` checkbox updated;
 - no unrelated refactors.

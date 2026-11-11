@@ -206,9 +206,12 @@ def test_web_errors_and_sync_apply(cfg: Config, dirty_project: Path) -> None:
         "/sync/apply", data={"csrf_token": sync_token}, follow_redirects=False
     )
     assert refused.status_code == 303 and "confirm" in refused.headers["location"]
+    preview_hash = re.search(
+        r'name="preview_hash" value="([^"]+)"', client.get("/sync").text
+    ).group(1)
     applied = client.post(
         "/sync/apply",
-        data={"confirm": "yes", "csrf_token": sync_token},
+        data={"confirm": "yes", "csrf_token": sync_token, "preview_hash": preview_hash},
         follow_redirects=False,
     )
     assert applied.status_code == 303 and "applied=1" in applied.headers["location"]

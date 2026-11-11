@@ -4,9 +4,31 @@
 <header class="page-head">
   <div>
     <h1>Merge two records.</h1>
-    <p class="lede">Pick the canonical record, edit the final claim, and archive the other. The write stays pending until sync.</p>
+    <p class="lede">Choose two records to compare. Keep the canonical record, update its claim, and archive the other.</p>
   </div>
 </header>
+
+{% if records | length > 1 %}
+<form class="merge-form" method="get" action="/merge">
+  <div class="form-grid">
+    <label>Canonical record
+      <select name="a">
+        {% for record in records %}
+        <option value="{{ record.id }}" {{ 'selected' if left and record.id == left.id else '' }}>{{ record.id }} · {{ record.claim | redact | short(80) }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Record to archive
+      <select name="b">
+        {% for record in records %}
+        <option value="{{ record.id }}" {{ 'selected' if right and record.id == right.id else '' }}>{{ record.id }} · {{ record.claim | redact | short(80) }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <div class="actions"><button class="button" type="submit">Compare selected records</button></div>
+</form>
+{% endif %}
 
 {% if view_left and view_right %}
   <div class="merge-grid">
@@ -37,24 +59,15 @@
     </article>
   </div>
 
-  <form class="merge-form" method="post" action="/merge">
+  {% if view_left.sensitivity == 'secret' or view_right.sensitivity == 'secret' %}
+  <div class="alert alert-warn">Merging is disabled for secret records. Archive or forget the secret record from its detail page instead.</div>
+  {% elif view_left.id == view_right.id %}
+  <div class="alert alert-warn">Choose two different records to merge.</div>
+  {% else %}
+  <form class="merge-form" method="post" action="/merge" data-confirm="Keep the canonical record and archive the other?">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <div class="form-grid">
-      <label>Canonical record
-        <select name="canonical">
-          {% for record in records %}
-            <option value="{{ record.id }}" {{ 'selected' if record.id == view_left.id else '' }}>{{ record.id }} · {{ record.claim | redact | short(80) }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>Archive this record
-        <select name="other">
-          {% for record in records %}
-            <option value="{{ record.id }}" {{ 'selected' if record.id == view_right.id else '' }}>{{ record.id }} · {{ record.claim | redact | short(80) }}</option>
-          {% endfor %}
-        </select>
-      </label>
-    </div>
+    <input type="hidden" name="canonical" value="{{ view_left.id }}">
+    <input type="hidden" name="other" value="{{ view_right.id }}">
 
     <label>Final claim
       <input name="claim" value="{{ view_left.claim }}">
@@ -66,8 +79,9 @@
       <a class="button button-ghost" href="/queue">Cancel</a>
     </div>
 
-    <p class="hint">The non-canonical record gets <code>status=archived</code> and <code>sync_action=delete</code>. Nothing is removed from disk until <code>memsift sync --apply</code>.</p>
+    <p class="hint">The canonical record keeps its remaining body text. The other record is archived. Markdown changes stay pending until you apply sync; OpenCode sources are read-only.</p>
   </form>
+  {% endif %}
 {% else %}
   <div class="empty-state">
     <h2>Need two records.</h2>

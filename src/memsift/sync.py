@@ -47,6 +47,15 @@ class SyncPlan:
     def diff_text(self) -> str:
         return "\n".join(change.diff for change in self.changes if change.diff)
 
+    def fingerprint(self) -> str:
+        payload = {
+            "changes": [
+                [str(c.path), c.original, c.updated, c.memory_ids] for c in self.changes
+            ],
+            "skipped": self.skipped,
+        }
+        return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+
 
 @dataclass(slots=True)
 class SyncResult:
@@ -101,7 +110,11 @@ def plan_sync(conn: sqlite3.Connection) -> SyncPlan:
                 f"{path}: source file changed since scan; rescan and review pending changes"
             )
             continue
-        blocks = parse_blocks(original, filename=path.name, relpath=path.name)
+        try:
+            blocks = parse_blocks(original, filename=path.name, relpath=path.name)
+        except ValueError as exc:
+            plan.skipped.append(f"{path}: {exc}")
+            continue
         by_id = {block.explicit_id: block for block in blocks if block.explicit_id}
         lines = original.splitlines(keepends=True)
         edits: list[tuple[int, int, list[str], str]] = []
@@ -199,6 +212,11 @@ def apply_sync(
             _atomic_write(change.path, change.updated)
             written.append((change.path, dest))
             digest = _source_digest(change.updated)
+            conn.execute(
+                "UPDATE memories SET source_hash = ? WHERE source_kind = 'markdown' "
+                "AND source_hash = ? AND substr(source_ref, 1, length(?)) = ?",
+                (digest, _source_digest(change.original), f"{change.path}:", f"{change.path}:"),
+            )
             db.upsert_source_file(
                 conn,
                 change.path,
@@ -275,6 +293,11 @@ def rollback_event(
             _atomic_write(path, original)
             written.append((path, current))
             digest = _source_digest(original)
+            conn.execute(
+                "UPDATE memories SET source_hash = ? WHERE source_kind = 'markdown' "
+                "AND source_hash = ? AND substr(source_ref, 1, length(?)) = ?",
+                (digest, _source_digest(current), f"{path}:", f"{path}:"),
+            )
             db.upsert_source_file(
                 conn,
                 path,

@@ -12,6 +12,23 @@ All notable changes to this project are documented here. The format follows
   numbered rail, a segmented health meter, and responsive layouts down to
   360px.
 
+### Fixed
+
+- Reject unclosed, mismatched, nested, and duplicate Markdown anchors before
+  they can modify unrelated source content.
+- Bind web sync approval to the displayed plan and reject stale previews.
+- Prevent editing or merging secret records, including direct form submissions.
+- Preserve multiline canonical content when editing or merging a claim.
+- Refresh source hashes for unchanged records after sync and rollback so
+  successive writes do not require an unnecessary rescan.
+- Compare merge selections before submission and show finding decisions.
+
+### Documentation
+
+- Isolate the quick-start demo index, simplify the README, and organize internal
+  specification, design, and implementation notes under `docs/`.
+- Ignore local agent settings, credentials, coverage artifacts, and temporary files.
+
 ## [0.1.0] — 2026-11-11
 
 First public preview.
