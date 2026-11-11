@@ -103,3 +103,11 @@ Status: v0.1.0 vertical slice complete and verified on 2026-11-10.
 - [x] Ignore local credentials and development artifacts.
 - [x] Put the product summary and first run at the top of the README.
 - [x] Add clone instructions and a dashboard screenshot using sample data.
+
+## Follow-up — Release readiness
+
+- [x] CI for Python 3.12–3.14 on Linux and Python 3.12 on macOS.
+- [x] `--version` flag and a single source for the package version.
+- [x] Release metadata, README badges, and complete sdist contents.
+- [x] Security policy, changelog, and platform support note.
+- [ ] Publish to PyPI (not requested yet).

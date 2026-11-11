@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 import json
+from importlib.metadata import version
 from pathlib import Path
 
 from typer.testing import CliRunner
 
+from memsift import __version__
 from memsift.cli import app
 
 runner = CliRunner()
+
+
+def test_version_flag_and_metadata() -> None:
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0, result.output
+    assert __version__ in result.output
+    assert version("memsift") == __version__
 
 
 def test_cli_init_scan_doctor_list_show(home: Path, monkeypatch, dirty_project: Path) -> None:

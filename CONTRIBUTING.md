@@ -11,8 +11,11 @@ Use Python 3.12 or newer:
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 .venv/bin/ruff check .
-.venv/bin/pytest
+.venv/bin/pytest --cov=src/memsift --cov-report=term-missing
 ```
+
+CI runs the suite on Python 3.12–3.14 for Linux and Python 3.12 for macOS. The
+coverage floor is 85%.
 
 Tests must run without network access. Use temporary files and synthetic data;
 do not include real memories, API keys or session databases in fixtures, issues

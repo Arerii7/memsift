@@ -1,5 +1,9 @@
 # memsift
 
+[![CI](https://github.com/Arerii7/memsift/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Arerii7/memsift/actions/workflows/ci.yml)
+![Coverage 89%](https://img.shields.io/badge/coverage-89%25-brightgreen)
+![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
+
 > Keep coding agent memories tidy, consistent, and under your control.
 
 memsift scans Markdown and explicit OpenCode memories for duplicates,
@@ -8,11 +12,12 @@ choose what to keep. Your index stays local; no account or cloud service needed.
 
 **Find. Review. Decide.** Source files change only after you approve a preview.
 
-![memsift dashboard showing findings from the included sample](docs/review-dashboard.png)
+![memsift dashboard showing findings from the included sample](https://raw.githubusercontent.com/Arerii7/memsift/master/docs/review-dashboard.png)
 
 ## Try it
 
-Requires Python 3.12 or newer and SQLite with FTS5.
+Requires Python 3.12 or newer and SQLite with FTS5. Tested on Linux and macOS;
+Windows is not supported yet.
 
 ```bash
 git clone https://github.com/Arerii7/memsift.git
@@ -29,6 +34,11 @@ The sample uses a **synthetic** key to demonstrate secret redaction. `review`
 opens a local interface at `http://127.0.0.1:8787`; stop it with `Ctrl+C`.
 
 > **Preview:** Try memsift on a copy of your files first and review every diff.
+
+> **Security:** memsift is a local, single-user tool. The review UI binds to
+> loopback and has no authentication; never expose it to a network. The local
+> index and backups can contain sensitive source content. See
+> [SECURITY.md](SECURITY.md) for the threat model and reporting process.
 
 To inspect another directory, use `.venv/bin/memsift scan --path /path/to/notes`.
 This also registers that path for future scans; add `--no-save` to scan it once.
@@ -119,11 +129,16 @@ review them manually.
 ```bash
 .venv/bin/pip install -e '.[dev]'
 .venv/bin/ruff check .
-.venv/bin/pytest
+.venv/bin/pytest --cov=src/memsift --cov-report=term-missing
 ```
 
-Tests use local fixtures and should not make network requests. See
+Tests use local fixtures and should not make network requests. CI runs the suite
+on Python 3.12–3.14 for Linux and on Python 3.12 for macOS. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for a short guide.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
