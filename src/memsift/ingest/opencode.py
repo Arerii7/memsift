@@ -77,13 +77,23 @@ def _session_rows(
     ).fetchall()
     if project is None:
         return rows
-    prefix = str(project.resolve())
-    return [
-        row
-        for row in rows
-        if str(row["directory"]).rstrip("/") == prefix
-        or str(row["directory"]).startswith(prefix + "/")
-    ]
+
+    def normalized(value: Path | str) -> str:
+        return str(value).rstrip("/")
+
+    def matches(directory: str, prefix: str) -> bool:
+        return directory == prefix or directory.startswith(prefix + "/")
+
+    # Session directories and the user's project path may differ by symlink
+    # resolution (notably /tmp vs /private/tmp on macOS).
+    prefixes = {normalized(project), normalized(project.resolve())}
+    matched: list[sqlite3.Row] = []
+    for row in rows:
+        directory = normalized(str(row["directory"]))
+        variants = {directory, normalized(Path(directory).resolve())}
+        if any(matches(candidate, prefix) for candidate in variants for prefix in prefixes):
+            matched.append(row)
+    return matched
 
 
 def ingest_opencode(

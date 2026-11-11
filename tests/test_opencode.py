@@ -4,7 +4,7 @@ import hashlib
 from pathlib import Path
 
 from memsift import db
-from memsift.config import Config
+from memsift.config import Config, project_scope
 from memsift.ingest.opencode import extract_markers, ingest_opencode
 
 
@@ -45,7 +45,7 @@ def test_opencode_import_is_read_only_and_project_scoped(
     }
     assert all(record.session_id for record in records)
     assert all(record.message_id for record in records)
-    assert all(record.scope == "project:/tmp/project" for record in records)
+    assert all(record.scope == project_scope(Path("/tmp/project")) for record in records)
     assert all("other project" not in record.claim for record in records)
 
 
@@ -56,3 +56,13 @@ def test_opencode_import_is_idempotent(conn, cfg: Config, opencode_db: Path) -> 
     second = {record.id for record in db.all_memories(conn)}
     assert first == second
     assert len(second) == 3
+
+
+def test_opencode_import_matches_symlinked_project(
+    conn, cfg: Config, opencode_db: Path, tmp_path: Path
+) -> None:
+    link = tmp_path / "linked-project"
+    link.symlink_to("/tmp/project")
+    stats = ingest_opencode(conn, opencode_db=opencode_db, project=link, config=cfg)
+    conn.commit()
+    assert stats.records == 3
