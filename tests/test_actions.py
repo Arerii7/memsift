@@ -63,3 +63,16 @@ def test_supersede_points_old_to_new(conn, cfg: Config, dirty_project: Path) -> 
     assert db.get_memory(conn, old.id).status == "archived"
     assert db.get_memory(conn, new.id).supersedes == old.id
     assert db.get_event(conn, action_id).action == "supersede"
+
+
+def test_append_only_ids_stay_unique_within_one_millisecond(conn, monkeypatch) -> None:
+    monkeypatch.setattr("memsift.db.now_ms", lambda: 1_700_000_000_000)
+
+    first = db.insert_event(conn, memory_id=None, action="test")
+    second = db.insert_event(conn, memory_id=None, action="test")
+    assert first != second
+
+    db.record_detector_run(conn, started_at=1, finished_at=1, stats={})
+    db.record_detector_run(conn, started_at=1, finished_at=1, stats={})
+    run_count = conn.execute("SELECT COUNT(*) FROM detector_runs").fetchone()[0]
+    assert run_count == 2

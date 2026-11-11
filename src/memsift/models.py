@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import secrets
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -17,6 +18,11 @@ def now_ms() -> int:
 def stable_id(prefix: str, *parts: object) -> str:
     digest = hashlib.sha256("\x1f".join(str(p) for p in parts).encode("utf-8")).hexdigest()
     return f"{prefix}_{digest[:16]}"
+
+
+def new_id(prefix: str) -> str:
+    """Return a random id for append-only records such as events."""
+    return f"{prefix}_{secrets.token_hex(8)}"
 
 
 def json_list(value: list[str] | None) -> str:

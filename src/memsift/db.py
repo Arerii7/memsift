@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from .models import Event, Finding, MemoryRecord, now_ms, stable_id
+from .models import Event, Finding, MemoryRecord, new_id, now_ms
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS memories (
@@ -263,7 +263,7 @@ def insert_event(
     after: dict[str, Any] | None = None,
     note: str = "",
 ) -> str:
-    event_id = stable_id("ev", action, memory_id or "", now_ms(), note)
+    event_id = new_id("ev")
     conn.execute(
         """
         INSERT INTO events (id, memory_id, action, actor, at, before_json, after_json, note)
@@ -480,7 +480,7 @@ def record_detector_run(
 ) -> None:
     conn.execute(
         "INSERT INTO detector_runs (id, started_at, finished_at, stats_json) VALUES (?, ?, ?, ?)",
-        (stable_id("run", started_at, finished_at), started_at, finished_at, json.dumps(stats)),
+        (new_id("run"), started_at, finished_at, json.dumps(stats)),
     )
 
 

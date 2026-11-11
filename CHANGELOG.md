@@ -32,6 +32,11 @@ First public preview.
 - Source files change only after an approved sync; OpenCode data stays
   read-only.
 
+### Fixed
+
+- Event and detector-run ids are random, so two appends in the same millisecond
+  can no longer collide.
+
 ### Known limitations
 
 - Writing is supported only for Markdown blocks wrapped in memsift anchors.
